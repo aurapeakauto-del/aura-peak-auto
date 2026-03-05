@@ -27,27 +27,23 @@ export async function proxy(req: NextRequest) {
     } = await supabase.auth.getSession()
 
     console.log('📍 Proxy - Path:', req.nextUrl.pathname)
-    console.log('📍 Proxy - Session exists:', !!session)
+    console.log('📍 Proxy - Session:', !!session)
 
-    // إذا كان المستخدم يحاول الوصول إلى /admin بدون جلسة
-    if (req.nextUrl.pathname.startsWith('/admin') && !session) {
-        console.log('📍 Proxy - لا توجد جلسة، توجيه إلى login')
-        if (!req.nextUrl.pathname.startsWith('/admin/login')) {
-            const redirectUrl = new URL('/admin/login', req.url)
-            return NextResponse.redirect(redirectUrl)
-        }
+    // إذا كان المستخدم يحاول الوصول إلى /admin (وليس /admin/login) بدون جلسة
+    if (req.nextUrl.pathname === '/admin' && !session) {
+        console.log('📍 Proxy - توجيه إلى login')
+        return NextResponse.redirect(new URL('/admin/login', req.url))
     }
 
-    // ✅ الأهم: إذا كان المستخدم يحاول الوصول إلى /admin/login ولديه جلسة
-    if (req.nextUrl.pathname.startsWith('/admin/login') && session) {
-        console.log('📍 Proxy - توجد جلسة، توجيه إلى admin')
-        const redirectUrl = new URL('/admin', req.url)
-        return NextResponse.redirect(redirectUrl)
+    // إذا كان المستخدم يحاول الوصول إلى /admin/login ولديه جلسة
+    if (req.nextUrl.pathname === '/admin/login' && session) {
+        console.log('📍 Proxy - توجيه إلى admin')
+        return NextResponse.redirect(new URL('/admin', req.url))
     }
 
     return res
 }
 
 export const config = {
-    matcher: '/admin/:path*',
+    matcher: ['/admin', '/admin/login'], // فقط هذين المسارين
 }
