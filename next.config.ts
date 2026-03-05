@@ -1,18 +1,10 @@
-﻿/** @type {import('next').NextConfig} */
-const nextConfig = {
+﻿import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
     reactStrictMode: false,
     images: {
-        remotePatterns: [
-            {
-                protocol: 'https',
-                hostname: 'res.cloudinary.com',
-            },
-            {
-                protocol: 'https',
-                hostname: 'images.unsplash.com',
-            },
-        ],
+        domains: ['res.cloudinary.com'],
     },
 }
 
-module.exports = nextConfig
+export default nextConfig
