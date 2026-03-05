@@ -116,12 +116,7 @@ export default function AdminPage() {
 
   
 
-    const loadCategories = async () => {
-        const { getAllCategories } = await import('@/app/lib/categories');
-        const cats = await getAllCategories();
-        setAvailableCategories(cats.map(c => c.name));
-    };
-
+   
     const handleLogout = async () => {
         await supabase.auth.signOut();
         router.push('/admin/login');
