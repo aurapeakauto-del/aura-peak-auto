@@ -3,27 +3,35 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/app/lib/supabase';
 
 export default function Navbar() {
     const pathname = usePathname();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [showAdminLink, setShowAdminLink] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
-    // التحقق من وجود صلاحية الدخول
+    // التحقق من جلسة المشرف
     useEffect(() => {
-        const adminAccess = localStorage.getItem('auraAdmin');
-        if (adminAccess === 'true') {
-            setShowAdminLink(true);
-        }
+        const checkAdmin = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setIsAdmin(!!session); // ✅ يتحقق من وجود جلسة نشطة
+        };
+        
+        checkAdmin();
+
+        // استماع لتغييرات الجلسة (تسجيل الدخول/الخروج)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setIsAdmin(!!session);
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
-    // ✅ تم إزالة رابط "من نحن" من القائمة
     const navLinks = [
         { href: '/', label: 'الرئيسية' },
         { href: '/products', label: 'المنتجات' },
         { href: '/offers', label: 'العروض' },
-        { href: '/products#best-sellers', label: 'الأكثر مبيعاً' },
-        ...(showAdminLink ? [{ href: '/admin', label: 'لوحة التحكم' }] : []),
+        ...(isAdmin ? [{ href: '/admin', label: 'لوحة التحكم' }] : []), // ✅ يظهر فقط للمشرف المسجل
     ];
 
     const isActive = (path: string) => pathname === path;
@@ -40,7 +48,7 @@ export default function Navbar() {
                         Aura Peak <span className="text-gray-400">Auto</span>
                     </Link>
 
-                    {/* Desktop Menu - في المنتصف (بدون "من نحن") */}
+                    {/* Desktop Menu - في المنتصف */}
                     <div className="hidden md:flex items-center gap-6 lg:gap-8">
                         {navLinks.map((link) => (
                             <Link
@@ -59,7 +67,7 @@ export default function Navbar() {
                         ))}
                     </div>
 
-                    {/* زر القائمة للهواتف - في أقصى اليسار (بدون أيقونة السلة) */}
+                    {/* زر القائمة للهواتف - في أقصى اليسار */}
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -76,7 +84,7 @@ export default function Navbar() {
                     </div>
                 </div>
 
-                {/* Mobile Menu - القائمة المنسدلة للهواتف (بدون "من نحن") */}
+                {/* Mobile Menu - القائمة المنسدلة للهواتف */}
                 <div className={`
                     md:hidden overflow-hidden transition-all duration-300 ease-in-out
                     ${isMenuOpen ? 'max-h-96 border-t border-gray-800' : 'max-h-0'}
