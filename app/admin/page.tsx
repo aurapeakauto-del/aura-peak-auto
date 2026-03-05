@@ -24,7 +24,40 @@ export default function AdminPage() {
 
     const { showToast } = useToast();
     const router = useRouter();
+    useEffect(() => {
+        checkUser();
+    }, []);
 
+    const checkUser = async () => {
+        console.log('🔍 Admin page - Checking session...');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔍 Admin page - Session:', session ? 'موجودة' : 'غير موجودة');
+
+        if (!session) {
+            console.log('🔍 لا توجد جلسة، توجيه إلى login');
+            window.location.replace('/admin/login');
+        } else {
+            setUserEmail(session.user.email || '');
+            setIsAuthorized(true);
+            setLoading(false);
+            // تحميل البيانات بعد التأكد من الجلسة
+            loadProducts();
+            loadCategories();
+        }
+    };
+
+    const loadProducts = async () => {
+        setProductsLoading(true);
+        const data = await getAllProducts();
+        setProductList(data);
+        setProductsLoading(false);
+    };
+
+    const loadCategories = async () => {
+        const { getAllCategories } = await import('@/app/lib/categories');
+        const cats = await getAllCategories();
+        setAvailableCategories(cats.map(c => c.name));
+    };
     // نموذج مبسط جداً
     const [formData, setFormData] = useState({
         id: 0,
@@ -49,15 +82,6 @@ export default function AdminPage() {
         variantOptions: '',
         relatedProducts: '',
     });
-    useEffect(() => {
-        const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                window.location.href = '/admin/login';
-            }
-        };
-        checkSession();
-    }, []);
     // التحقق من الجلسة عند تحميل الصفحة
     useEffect(() => {
         checkUser();

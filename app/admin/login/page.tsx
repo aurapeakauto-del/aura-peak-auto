@@ -24,10 +24,16 @@ export default function AdminLogin() {
             if (error) throw error;
 
             if (data?.session) {
-                // ✅ توجيه مباشر
-                window.location.href = '/admin';
+                console.log('✅ تم تسجيل الدخول، جاري التوجيه...');
+
+                // ✅ استخدام replace بدلاً من href
+                window.location.replace('/admin');
+
+                // ✅ تأكيد أن الكود وصل إلى هنا
+                console.log('✅ تم تنفيذ window.location.replace');
             }
         } catch (err: any) {
+            console.error('❌ خطأ:', err);
             setError(err.message || 'حدث خطأ في تسجيل الدخول');
         } finally {
             setLoading(false);
