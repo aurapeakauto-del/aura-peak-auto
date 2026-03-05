@@ -16,6 +16,7 @@ export default function HomePage() {
     const [sent, setSent] = useState(false);
 
     // خلفية متحركة - نجوم أكثر وضوحاً
+    // خلفية متحركة - نجوم أكثر وضوحاً
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -30,7 +31,17 @@ export default function HomePage() {
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
 
-        const particles = [];
+        // ✅ تحديد نوع الجسيمات
+        interface Particle {
+            x: number;
+            y: number;
+            radius: number;
+            speed: number;
+            opacity: number;
+        }
+
+        // نجوم أكثر وضوحاً
+        const particles: Particle[] = [];
         for (let i = 0; i < 80; i++) {
             particles.push({
                 x: Math.random() * canvas.width,
