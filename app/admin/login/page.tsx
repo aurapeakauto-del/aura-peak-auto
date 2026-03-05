@@ -17,7 +17,7 @@ export default function AdminLogin() {
         setLoading(true);
         setError(null);
 
-        console.log('1️⃣ محاولة تسجيل الدخول بـ:', email); // ✅ تشخيص
+        console.log('1️⃣ محاولة تسجيل الدخول بـ:', email);
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -25,24 +25,24 @@ export default function AdminLogin() {
                 password,
             });
 
-            console.log('2️⃣ نتيجة Supabase:', { data, error }); // ✅ تشخيص
+            console.log('2️⃣ نتيجة Supabase:', { data, error });
 
             if (error) {
                 throw error;
             }
 
             if (data?.session) {
-                console.log('3️⃣ تم إنشاء جلسة:', data.session); // ✅ تشخيص
+                console.log('3️⃣ تم إنشاء جلسة:', data.session);
 
-                // ✅ التأكد من وجود session قبل التوجيه
-                router.push('/admin');
-                router.refresh();
+                // ✅ استخدام window.location بدلاً من router.push
+                console.log('4️⃣ محاولة التوجيه إلى /admin');
+                window.location.href = '/admin';
             } else {
-                console.log('4️⃣ لا توجد جلسة في البيانات'); // ✅ تشخيص
+                console.log('❌ لا توجد جلسة في البيانات');
                 setError('حدث خطأ غير متوقع');
             }
         } catch (err: any) {
-            console.error('5️⃣ خطأ:', err); // ✅ تشخيص
+            console.error('5️⃣ خطأ:', err);
             setError(err.message || 'حدث خطأ في تسجيل الدخول');
         } finally {
             setLoading(false);
