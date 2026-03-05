@@ -10,7 +10,9 @@ export interface Product {
     images: string[];
     categories: string[];
     discount?: number;
+    discount_end_date?: string | null;  // ✅ أضفنا هذا
     freeShipping?: boolean;
+    free_shipping_end_date?: string | null;  // ✅ أضفنا هذا
     offer?: boolean;
     featured?: boolean;
     recommended?: boolean;
@@ -32,7 +34,9 @@ const mapSupabaseProduct = (data: any): Product => ({
     images: data.images || [],
     categories: data.categories || [],
     discount: data.discount || 0,
+    discount_end_date: data.discount_end_date || null,  // ✅ أضفنا هذا
     freeShipping: data.free_shipping || false,
+    free_shipping_end_date: data.free_shipping_end_date || null,  // ✅ أضفنا هذا
     offer: data.offer || false,
     featured: data.featured || false,
     recommended: data.recommended || false,
@@ -51,7 +55,9 @@ const toSupabaseProduct = (product: Partial<Product>) => ({
     images: product.images || [],
     categories: product.categories || [],
     discount: product.discount || 0,
+    discount_end_date: product.discount_end_date || null,  // ✅ أضفنا هذا
     free_shipping: product.freeShipping || false,
+    free_shipping_end_date: product.free_shipping_end_date || null,  // ✅ أضفنا هذا
     offer: product.offer || false,
     featured: product.featured || false,
     recommended: product.recommended || false,
