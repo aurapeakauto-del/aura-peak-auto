@@ -23,12 +23,6 @@ export async function addOrder(order: Omit<Order, 'id' | 'created_at'>): Promise
 
     if (error) {
         console.error('❌ خطأ في إضافة الطلب:', error);
-        console.error('❌ تفاصيل الخطأ:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-        });
         return null;
     }
 
@@ -36,7 +30,7 @@ export async function addOrder(order: Omit<Order, 'id' | 'created_at'>): Promise
     return data;
 }
 
-// باقي الدوال كما هي...
+// جلب جميع الطلبات
 export async function getAllOrders(): Promise<Order[]> {
     const { data, error } = await supabase
         .from('orders')
@@ -51,6 +45,7 @@ export async function getAllOrders(): Promise<Order[]> {
     return data || [];
 }
 
+// جلب إحصائيات المبيعات
 export async function getSalesStats(days: number = 30) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
@@ -70,6 +65,7 @@ export async function getSalesStats(days: number = 30) {
         };
     }
 
+    // إحصائيات يومية
     const dailyStats: Record<string, { orders: number; revenue: number }> = {};
 
     data.forEach(order => {
@@ -81,6 +77,7 @@ export async function getSalesStats(days: number = 30) {
         dailyStats[date].revenue += order.total_amount;
     });
 
+    // أكثر المنتجات مبيعاً
     const productSales: Record<string, { name: string; quantity: number; revenue: number; image?: string; price: number }> = {};
 
     data.forEach(order => {
@@ -113,6 +110,7 @@ export async function getSalesStats(days: number = 30) {
     };
 }
 
+// جلب المنتجات الأكثر مبيعاً
 export async function getBestSellers(limit: number = 8) {
     const { data: orders, error } = await supabase
         .from('orders')
@@ -146,4 +144,19 @@ export async function getBestSellers(limit: number = 8) {
     return Object.values(productCount)
         .sort((a, b) => b.count - a.count)
         .slice(0, limit);
+}
+
+// ✅ **الدالة الجديدة: تحديث حالة الطلب**
+export async function updateOrderStatus(orderId: number, status: string): Promise<boolean> {
+    const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId);
+
+    if (error) {
+        console.error('خطأ في تحديث حالة الطلب:', error);
+        return false;
+    }
+
+    return true;
 }
