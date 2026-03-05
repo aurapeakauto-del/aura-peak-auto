@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { supabase } from '@/app/lib/supabase';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function AdminLogin() {
@@ -10,14 +9,11 @@ export default function AdminLogin() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const router = useRouter();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-
-        console.log('1️⃣ محاولة تسجيل الدخول بـ:', email);
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -25,24 +21,13 @@ export default function AdminLogin() {
                 password,
             });
 
-            console.log('2️⃣ نتيجة Supabase:', { data, error });
-
-            if (error) {
-                throw error;
-            }
+            if (error) throw error;
 
             if (data?.session) {
-                console.log('3️⃣ تم إنشاء جلسة:', data.session);
-
-                // ✅ استخدام window.location بدلاً من router.push
-                console.log('4️⃣ محاولة التوجيه إلى /admin');
+                // ✅ توجيه مباشر
                 window.location.href = '/admin';
-            } else {
-                console.log('❌ لا توجد جلسة في البيانات');
-                setError('حدث خطأ غير متوقع');
             }
         } catch (err: any) {
-            console.error('5️⃣ خطأ:', err);
             setError(err.message || 'حدث خطأ في تسجيل الدخول');
         } finally {
             setLoading(false);
@@ -63,7 +48,6 @@ export default function AdminLogin() {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none"
-                            placeholder="admin@example.com"
                         />
                     </div>
 
@@ -75,7 +59,6 @@ export default function AdminLogin() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none"
-                            placeholder="••••••••"
                         />
                     </div>
 

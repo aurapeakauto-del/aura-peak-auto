@@ -8,6 +8,7 @@ import { useToast } from '@/app/components/Toast';
 import { supabase } from '@/app/lib/supabase';
 import { useRouter } from 'next/navigation';
 
+
 export default function AdminPage() {
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -48,7 +49,15 @@ export default function AdminPage() {
         variantOptions: '',
         relatedProducts: '',
     });
-
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = '/admin/login';
+            }
+        };
+        checkSession();
+    }, []);
     // التحقق من الجلسة عند تحميل الصفحة
     useEffect(() => {
         checkUser();
