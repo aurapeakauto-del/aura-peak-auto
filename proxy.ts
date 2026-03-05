@@ -1,38 +1,36 @@
-﻿import { createServerClient } from '@supabase/auth-helpers-nextjs'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+﻿import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(req: NextRequest) {
     const res = NextResponse.next()
-    const supabase = createServerClient({ req, res })
+    
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return req.cookies.get(name)?.value
+                },
+                set(name: string, value: string, options: any) {
+                    res.cookies.set({ name, value, ...options })
+                },
+                remove(name: string, options: any) {
+                    res.cookies.set({ name, value: '', ...options })
+                },
+            },
+        }
+    )
 
     const {
         data: { session },
     } = await supabase.auth.getSession()
 
-    // التحقق من مسارات admin
-    if (req.nextUrl.pathname.startsWith('/admin')) {
-        // استثناء صفحة login
-        if (req.nextUrl.pathname === '/admin/login') {
-            // إذا كان المستخدم مسجل دخوله بالفعل، حوله للوحة التحكم
-            if (session) {
-                return NextResponse.redirect(new URL('/admin', req.url))
-            }
-            return res
-        }
-
-        // باقي صفحات admin تحتاج تسجيل دخول
-        if (!session) {
-            return NextResponse.redirect(new URL('/admin/login', req.url))
-        }
-
-        // تحقق إذا كان البريد مصرحاً به
-        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL
-        if (adminEmail && session.user.email !== adminEmail) {
-            // سجل خروج المستخدم غير المصرح له
-            await supabase.auth.signOut()
+    // إذا كان المستخدم يحاول الوصول إلى /admin بدون جلسة
+    if (req.nextUrl.pathname.startsWith('/admin') && !session) {
+        // استثناء صفحة تسجيل الدخول نفسها
+        if (!req.nextUrl.pathname.startsWith('/admin/login')) {
             const redirectUrl = new URL('/admin/login', req.url)
-            redirectUrl.searchParams.set('error', 'unauthorized')
             return NextResponse.redirect(redirectUrl)
         }
     }
@@ -41,5 +39,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/admin/:path*']
+    matcher: '/admin/:path*',
 }
