@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/app/lib/supabase';
-import { useRouter } from 'next/navigation'; // ✅ إضافة useRouter
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function AdminLogin() {
@@ -10,12 +10,14 @@ export default function AdminLogin() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const router = useRouter(); // ✅ تهيئة router
+    const router = useRouter();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+
+        console.log('1️⃣ محاولة تسجيل الدخول بـ:', email); // ✅ تشخيص
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -23,16 +25,24 @@ export default function AdminLogin() {
                 password,
             });
 
+            console.log('2️⃣ نتيجة Supabase:', { data, error }); // ✅ تشخيص
+
             if (error) {
                 throw error;
             }
 
             if (data?.session) {
-                // ✅ التوجيه إلى صفحة الإدارة بعد نجاح تسجيل الدخول
+                console.log('3️⃣ تم إنشاء جلسة:', data.session); // ✅ تشخيص
+
+                // ✅ التأكد من وجود session قبل التوجيه
                 router.push('/admin');
-                router.refresh(); // لتحديث الجلسة في الـ Navbar
+                router.refresh();
+            } else {
+                console.log('4️⃣ لا توجد جلسة في البيانات'); // ✅ تشخيص
+                setError('حدث خطأ غير متوقع');
             }
         } catch (err: any) {
+            console.error('5️⃣ خطأ:', err); // ✅ تشخيص
             setError(err.message || 'حدث خطأ في تسجيل الدخول');
         } finally {
             setLoading(false);
