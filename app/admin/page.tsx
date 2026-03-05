@@ -114,19 +114,7 @@ export default function AdminPage() {
         }
     };
 
-    useEffect(() => {
-        if (isAuthorized) {
-            loadProducts();
-            loadCategories();
-        }
-    }, [isAuthorized]);
-
-    const loadProducts = async () => {
-        setProductsLoading(true);
-        const data = await getAllProducts();
-        setProductList(data);
-        setProductsLoading(false);
-    };
+  
 
     const loadCategories = async () => {
         const { getAllCategories } = await import('@/app/lib/categories');
