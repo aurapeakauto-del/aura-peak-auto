@@ -87,36 +87,6 @@ export default function AdminPage() {
         checkUser();
     }, []);
 
-    const checkUser = async () => {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-
-            if (!session) {
-                router.push('/admin/login');
-                return;
-            }
-
-            // تحقق إذا كان البريد مصرحاً به (اختياري)
-            const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-            if (adminEmail && session.user.email !== adminEmail) {
-                await supabase.auth.signOut();
-                router.push('/admin/login?error=unauthorized');
-                return;
-            }
-
-            setUserEmail(session.user.email || '');
-            setIsAuthorized(true);
-        } catch (error) {
-            console.error('خطأ في التحقق من المستخدم:', error);
-            router.push('/admin/login');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-  
-
-   
     const handleLogout = async () => {
         await supabase.auth.signOut();
         router.push('/admin/login');
