@@ -350,7 +350,6 @@ export default function AdminPage() {
                         </h2>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* نفس محتوى النموذج السابق - بدون تغيير */}
                             {/* ===== القسم الأساسي (الأهم) ===== */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* الاسم */}
@@ -650,7 +649,7 @@ export default function AdminPage() {
                                         )}
                                     </div>
 
-                                    {/* منتجات مقترحة */}
+                                    {/* منتجات مقترحة - مع شرح الأرقام */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">منتجات مقترحة</label>
                                         <input
@@ -659,8 +658,11 @@ export default function AdminPage() {
                                             value={formData.relatedProducts}
                                             onChange={handleInputChange}
                                             className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none transition-colors"
-                                            placeholder="أرقام المنتجات مفصولة بفواصل"
+                                            placeholder="مثال: 2, 4, 6"
                                         />
+                                        <p className="text-gray-500 text-xs mt-1">
+                                            أدخل أرقام المنتجات (IDs) مفصولة بفواصل، يمكنك رؤية الأرقام في عمود "#" بالجدول أدناه.
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -688,16 +690,17 @@ export default function AdminPage() {
                     </div>
                 )}
 
-                {/* جدول المنتجات */}
+                {/* جدول المنتجات - مع إضافة عمود "#" لعرض رقم المنتج */}
                 <div className="bg-black border border-gray-800 overflow-x-auto">
                     {productsLoading ? (
                         <div className="text-center py-20">
                             <p className="text-gray-500">جاري تحميل المنتجات...</p>
                         </div>
                     ) : (
-                        <table className="w-full min-w-[800px]">
+                        <table className="w-full min-w-[850px]">
                             <thead className="bg-gray-900">
                                 <tr>
+                                    <th className="px-6 py-4 text-right text-gray-400 font-light">#</th>
                                     <th className="px-6 py-4 text-right text-gray-400 font-light">المنتج</th>
                                     <th className="px-6 py-4 text-right text-gray-400 font-light">السعر</th>
                                     <th className="px-6 py-4 text-right text-gray-400 font-light">المخزون</th>
@@ -713,6 +716,9 @@ export default function AdminPage() {
 
                                     return (
                                         <tr key={product.id} className="hover:bg-gray-900/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <span className="text-amber-500 font-mono">#{product.id}</span>
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-white">{product.name}</p>
                                             </td>
