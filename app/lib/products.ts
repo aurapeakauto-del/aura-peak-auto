@@ -10,9 +10,9 @@ export interface Product {
     images: string[];
     categories: string[];
     discount?: number;
-    discount_end_date?: string | null;  // ✅ أضفنا هذا
+    discount_end_date?: string | null;
     freeShipping?: boolean;
-    free_shipping_end_date?: string | null;  // ✅ أضفنا هذا
+    free_shipping_end_date?: string | null;
     offer?: boolean;
     featured?: boolean;
     recommended?: boolean;
@@ -22,6 +22,42 @@ export interface Product {
         options: string[];
     }[];
     relatedProducts?: number[];
+}
+
+// ✅ إرسال إشعار إلى n8n عند إضافة منتج جديد
+async function notifyN8N(product: Product) {
+    try {
+        const webhookUrl = process.env.N8N_PRODUCT_WEBHOOK_URL;
+        if (!webhookUrl) {
+            console.log('⚠️ N8N_PRODUCT_WEBHOOK_URL غير مضبوط');
+            return;
+        }
+
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://aura-peak-auto.vercel.app';
+
+        await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                event: 'new_product',
+                product: {
+                    id: product.id,
+                    name: product.name,
+                    description: product.description,
+                    price: product.price,
+                    category: product.categories?.[0] || '',
+                    stock: product.stock,
+                    image_url: product.image,
+                    url: `${siteUrl}/products/${product.id}`
+                }
+            })
+        });
+        console.log('✅ تم إرسال الإشعار إلى n8n للمنتج: ${product.name}');
+    } catch (error) {
+        console.error('❌ فشل إرسال الإشعار إلى n8n:', error);
+    }
 }
 
 // ✅ تحويل البيانات من Supabase إلى شكل Product
@@ -34,9 +70,9 @@ const mapSupabaseProduct = (data: any): Product => ({
     images: data.images || [],
     categories: data.categories || [],
     discount: data.discount || 0,
-    discount_end_date: data.discount_end_date || null,  // ✅ أضفنا هذا
+    discount_end_date: data.discount_end_date || null,
     freeShipping: data.free_shipping || false,
-    free_shipping_end_date: data.free_shipping_end_date || null,  // ✅ أضفنا هذا
+    free_shipping_end_date: data.free_shipping_end_date || null,
     offer: data.offer || false,
     featured: data.featured || false,
     recommended: data.recommended || false,
@@ -55,9 +91,9 @@ const toSupabaseProduct = (product: Partial<Product>) => ({
     images: product.images || [],
     categories: product.categories || [],
     discount: product.discount || 0,
-    discount_end_date: product.discount_end_date || null,  // ✅ أضفنا هذا
+    discount_end_date: product.discount_end_date || null,
     free_shipping: product.freeShipping || false,
-    free_shipping_end_date: product.free_shipping_end_date || null,  // ✅ أضفنا هذا
+    free_shipping_end_date: product.free_shipping_end_date || null,
     offer: product.offer || false,
     featured: product.featured || false,
     recommended: product.recommended || false,
@@ -164,7 +200,7 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 
 // ============ دوال الإدارة (Admin) ============
 
-// ✅ إضافة منتج جديد
+// ✅ إضافة منتج جديد (معدل لإرسال إشعار إلى n8n)
 export async function addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
     // الحصول على أقصى ID + 1
     const { data: maxIdData } = await supabase
@@ -191,7 +227,12 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
         return null
     }
 
-    return mapSupabaseProduct(data)
+    const newProduct = mapSupabaseProduct(data)
+
+    // 🔔 إرسال إشعار إلى n8n
+    await notifyN8N(newProduct);
+
+    return newProduct
 }
 
 // ✅ تحديث منتج
