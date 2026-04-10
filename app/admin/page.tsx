@@ -8,7 +8,6 @@ import { useToast } from '@/app/components/Toast';
 import { supabase } from '@/app/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-
 export default function AdminPage() {
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -24,6 +23,7 @@ export default function AdminPage() {
 
     const { showToast } = useToast();
     const router = useRouter();
+
     useEffect(() => {
         checkUser();
     }, []);
@@ -40,7 +40,6 @@ export default function AdminPage() {
             setUserEmail(session.user.email || '');
             setIsAuthorized(true);
             setLoading(false);
-            // تحميل البيانات بعد التأكد من الجلسة
             loadProducts();
             loadCategories();
         }
@@ -58,7 +57,7 @@ export default function AdminPage() {
         const cats = await getAllCategories();
         setAvailableCategories(cats.map(c => c.name));
     };
-    // نموذج مبسط جداً
+
     const [formData, setFormData] = useState({
         id: 0,
         name: '',
@@ -82,10 +81,6 @@ export default function AdminPage() {
         variantOptions: '',
         relatedProducts: '',
     });
-    // التحقق من الجلسة عند تحميل الصفحة
-    useEffect(() => {
-        checkUser();
-    }, []);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -131,7 +126,6 @@ export default function AdminPage() {
         setShowAdvanced(false);
     };
 
-    // حساب تاريخ انتهاء الخصم
     const calculateEndDate = (type: string, dateValue: string, daysValue: string) => {
         if (type === 'date' && dateValue) {
             return dateValue;
@@ -171,7 +165,6 @@ export default function AdminPage() {
             ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
             : undefined;
 
-        // حساب تواريخ الانتهاء
         const discountEndDate = calculateEndDate(
             formData.discountEndType,
             formData.discountEndDate,
@@ -270,7 +263,6 @@ export default function AdminPage() {
         }
     };
 
-    // التحقق من العروض النشطة
     const isDiscountActive = (product: Product) => {
         if (!product.discount) return false;
         if (!product.discount_end_date) return true;
@@ -283,7 +275,6 @@ export default function AdminPage() {
         return new Date(product.free_shipping_end_date) >= new Date();
     };
 
-    // عرض شاشة التحميل
     if (loading) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center">
@@ -296,36 +287,36 @@ export default function AdminPage() {
     }
 
     if (!isAuthorized) {
-        return null; // تم التحويل إلى صفحة login
+        return null;
     }
 
     return (
         <div className="min-h-screen bg-black text-white">
             <div className="container mx-auto px-4 py-8">
-                {/* الهيدر مع البريد الإلكتروني */}
-                <div className="flex justify-between items-center mb-8">
+                {/* الهيدر */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                     <div>
                         <h1 className="text-3xl font-light tracking-wider">لوحة التحكم</h1>
                         <p className="text-gray-500 mt-2">
                             مرحباً {userEmail} | إدارة المنتجات والمخزون
                         </p>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                         <button
                             onClick={handleLogout}
-                            className="px-6 py-3 border border-gray-700 text-gray-300 hover:border-white hover:text-white transition-colors"
+                            className="px-4 py-2 border border-gray-700 text-gray-300 hover:border-white hover:text-white transition-colors text-sm"
                         >
                             تسجيل الخروج
                         </button>
                         <Link
                             href="/admin/categories"
-                            className="px-6 py-3 border border-gray-700 text-gray-300 hover:border-white hover:text-white transition-colors"
+                            className="px-4 py-2 border border-gray-700 text-gray-300 hover:border-white hover:text-white transition-colors text-sm"
                         >
                             التصنيفات
                         </Link>
                         <Link
                             href="/admin/reports"
-                            className="px-6 py-3 border border-gray-700 text-gray-300 hover:border-white hover:text-white transition-colors"
+                            className="px-4 py-2 border border-gray-700 text-gray-300 hover:border-white hover:text-white transition-colors text-sm"
                         >
                             التقارير
                         </Link>
@@ -334,7 +325,7 @@ export default function AdminPage() {
                                 resetForm();
                                 setShowForm(!showForm);
                             }}
-                            className="px-6 py-3 bg-white text-black hover:bg-gray-200 transition-colors"
+                            className="px-4 py-2 bg-white text-black hover:bg-gray-200 transition-colors text-sm"
                             disabled={saving}
                         >
                             {showForm ? 'إلغاء' : '+ إضافة منتج'}
@@ -342,18 +333,17 @@ export default function AdminPage() {
                     </div>
                 </div>
 
-                {/* نموذج إضافة/تعديل منتج - مبسط جداً */}
+                {/* نموذج إضافة/تعديل منتج */}
                 {showForm && (
-                    <div className="bg-black border border-gray-800 p-6 mb-8">
+                    <div className="bg-black border border-gray-800 p-4 sm:p-6 mb-8">
                         <h2 className="text-xl font-light mb-6">
                             {editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}
                         </h2>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* ===== القسم الأساسي (الأهم) ===== */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* الاسم */}
-                                <div className="md:col-span-2">
+                            {/* القسم الأساسي */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="sm:col-span-2">
                                     <label className="block text-gray-400 text-sm mb-2">اسم المنتج</label>
                                     <input
                                         type="text"
@@ -365,7 +355,6 @@ export default function AdminPage() {
                                     />
                                 </div>
 
-                                {/* السعر */}
                                 <div>
                                     <label className="block text-gray-400 text-sm mb-2">السعر (JD)</label>
                                     <input
@@ -379,7 +368,6 @@ export default function AdminPage() {
                                     />
                                 </div>
 
-                                {/* المخزون */}
                                 <div>
                                     <label className="block text-gray-400 text-sm mb-2">الكمية المتوفرة</label>
                                     <input
@@ -392,7 +380,6 @@ export default function AdminPage() {
                                     />
                                 </div>
 
-                                {/* الخصم */}
                                 <div>
                                     <label className="block text-gray-400 text-sm mb-2">نسبة الخصم (%)</label>
                                     <input
@@ -404,7 +391,6 @@ export default function AdminPage() {
                                     />
                                 </div>
 
-                                {/* نهاية الخصم */}
                                 <div>
                                     <label className="block text-gray-400 text-sm mb-2">نهاية الخصم</label>
                                     <select
@@ -446,7 +432,6 @@ export default function AdminPage() {
                                     </div>
                                 )}
 
-                                {/* توصيل مجاني */}
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"
@@ -458,7 +443,6 @@ export default function AdminPage() {
                                     <label className="text-gray-400 text-sm">توصيل مجاني</label>
                                 </div>
 
-                                {/* نهاية التوصيل المجاني */}
                                 {formData.freeShipping && (
                                     <>
                                         <div>
@@ -505,7 +489,7 @@ export default function AdminPage() {
                                 )}
                             </div>
 
-                            {/* ===== زر إظهار القسم المتقدم ===== */}
+                            {/* زر إظهار القسم المتقدم */}
                             <div className="border-t border-gray-800 pt-4">
                                 <button
                                     type="button"
@@ -517,38 +501,89 @@ export default function AdminPage() {
                                 </button>
                             </div>
 
-                            {/* ===== القسم المتقدم ===== */}
+                            {/* القسم المتقدم */}
                             {showAdvanced && (
                                 <div className="space-y-4">
                                     {/* الصورة الرئيسية */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">الصورة الرئيسية</label>
-                                        <input
-                                            type="text"
-                                            name="image"
-                                            value={formData.image}
-                                            onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none transition-colors"
-                                            placeholder="رابط الصورة"
-                                        />
-                                        <div className="mt-2">
-                                            <ImageUploader onUpload={(url) => {
-                                                setFormData(prev => ({ ...prev, image: url }));
-                                            }} />
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                name="image"
+                                                value={formData.image}
+                                                onChange={handleInputChange}
+                                                className="flex-1 px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none transition-colors text-sm"
+                                                placeholder="رابط الصورة"
+                                            />
+                                            <div className="sm:w-auto">
+                                                <ImageUploader onUpload={(url) => {
+                                                    setFormData(prev => ({ ...prev, image: url }));
+                                                    showToast('تم رفع الصورة الرئيسية بنجاح', 'success');
+                                                }} />
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* صور إضافية */}
+                                    {/* صور إضافية - مع رفع متعدد يحافظ على الصور السابقة */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">صور إضافية</label>
+
+                                        {/* روابط يدوية */}
                                         <input
                                             type="text"
                                             name="additionalImages"
                                             value={formData.additionalImages}
                                             onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none transition-colors"
-                                            placeholder="روابط مفصولة بفواصل"
+                                            className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none transition-colors text-sm mb-2"
+                                            placeholder="روابط مفصولة بفواصل (مثال: link1.jpg, link2.jpg)"
                                         />
+
+                                        {/* رفع الصور الإضافية */}
+                                        <div className="mt-2">
+                                            <label className="block text-gray-500 text-xs mb-1">أو ارفع صوراً إضافية</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                <ImageUploader onUpload={(url) => {
+                                                    const currentImages = formData.additionalImages ? formData.additionalImages.split(',').map(s => s.trim()) : [];
+                                                    currentImages.push(url);
+                                                    setFormData(prev => ({ ...prev, additionalImages: currentImages.join(', ') }));
+                                                    showToast('تمت إضافة الصورة إلى القائمة', 'success');
+                                                }} />
+                                            </div>
+                                        </div>
+
+                                        {/* عرض الصور المرفوعة مع إمكانية الحذف الفردي */}
+                                        {formData.additionalImages && (
+                                            <div className="mt-3">
+                                                <p className="text-gray-500 text-xs mb-2">الصور المضافة ({formData.additionalImages.split(',').length}) :</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {formData.additionalImages.split(',').map((img, idx) => (
+                                                        <div key={idx} className="relative group">
+                                                            <img
+                                                                src={img.trim()}
+                                                                alt={`صورة ${idx + 1}`}
+                                                                className="w-16 h-16 object-cover rounded border border-gray-700"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).src = '/images/placeholder.jpg';
+                                                                }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const images = formData.additionalImages.split(',').map(s => s.trim());
+                                                                    images.splice(idx, 1);
+                                                                    setFormData(prev => ({ ...prev, additionalImages: images.join(', ') }));
+                                                                    showToast('تم حذف الصورة', 'info');
+                                                                }}
+                                                                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* الوصف */}
@@ -566,7 +601,7 @@ export default function AdminPage() {
                                     {/* التصنيفات */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">التصنيفات</label>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-black border border-gray-800">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-black border border-gray-800">
                                             {availableCategories.map((cat) => (
                                                 <label key={cat} className="flex items-center gap-2 text-gray-300">
                                                     <input
@@ -649,7 +684,7 @@ export default function AdminPage() {
                                         )}
                                     </div>
 
-                                    {/* منتجات مقترحة - مع شرح الأرقام */}
+                                    {/* منتجات مقترحة */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">منتجات مقترحة</label>
                                         <input
@@ -667,7 +702,7 @@ export default function AdminPage() {
                                 </div>
                             )}
 
-                            <div className="flex gap-3 pt-4">
+                            <div className="flex flex-col sm:flex-row gap-3 pt-4">
                                 <button
                                     type="submit"
                                     disabled={saving}
@@ -690,7 +725,7 @@ export default function AdminPage() {
                     </div>
                 )}
 
-                {/* جدول المنتجات - مع إضافة عمود "#" لعرض رقم المنتج */}
+                {/* جدول المنتجات */}
                 <div className="bg-black border border-gray-800 overflow-x-auto">
                     {productsLoading ? (
                         <div className="text-center py-20">
@@ -777,7 +812,7 @@ export default function AdminPage() {
                                                     </button>
                                                 </div>
                                             </td>
-                                        </tr>
+                                        </td>
                                     );
                                 })}
                             </tbody>
