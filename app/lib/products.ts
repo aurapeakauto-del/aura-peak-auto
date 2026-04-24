@@ -1,5 +1,18 @@
 ﻿import { supabase } from './supabase'
 
+// ============ تعريف أنواع المتغيرات الجديدة ============
+export interface VariantOption {
+    name: string;           // اسم الخيار (أحمر، أزرق، كبير، صغير)
+    stock: number;          // الكمية المتوفرة لهذا الخيار
+    extraPrice: number;     // السعر الإضافي (0 إذا نفس السعر الأساسي)
+}
+
+export interface Variant {
+    id: string;             // معرف فريد (مؤقت)
+    name: string;           // اسم المتغير (اللون، المقاس، المادة)
+    options: VariantOption[];
+}
+
 export interface Product {
     id: number;
     name: string;
@@ -17,11 +30,15 @@ export interface Product {
     featured?: boolean;
     recommended?: boolean;
     stock: number;
-    variants?: {
-        name: string;
-        options: string[];
-    }[];
+    variants: Variant[];      // ✅ تغيير: أصبح مصفوفة Variant
     relatedProducts?: number[];
+}
+
+// ✅ حساب إجمالي الكمية من المتغيرات (للتحقق)
+export function getTotalStockFromVariants(variants: Variant[]): number {
+    return variants.reduce((total, variant) => {
+        return total + variant.options.reduce((sum, opt) => sum + opt.stock, 0);
+    }, 0);
 }
 
 // ✅ إرسال إشعار إلى n8n عند إضافة منتج جديد
@@ -54,32 +71,49 @@ async function notifyN8N(product: Product) {
                 }
             })
         });
-        console.log('✅ تم إرسال الإشعار إلى n8n للمنتج: ${product.name}');
+        console.log(`✅ تم إرسال الإشعار إلى n8n للمنتج: ${product.name}`);
     } catch (error) {
         console.error('❌ فشل إرسال الإشعار إلى n8n:', error);
     }
 }
 
-// ✅ تحويل البيانات من Supabase إلى شكل Product
-const mapSupabaseProduct = (data: any): Product => ({
-    id: data.id,
-    name: data.name,
-    description: data.description || '',
-    price: data.price,
-    image: data.image || '/images/placeholder.jpg',
-    images: data.images || [],
-    categories: data.categories || [],
-    discount: data.discount || 0,
-    discount_end_date: data.discount_end_date || null,
-    freeShipping: data.free_shipping || false,
-    free_shipping_end_date: data.free_shipping_end_date || null,
-    offer: data.offer || false,
-    featured: data.featured || false,
-    recommended: data.recommended || false,
-    stock: data.stock || 0,
-    variants: data.variants || [],
-    relatedProducts: data.related_products || []
-})
+// ✅ تحويل البيانات من Supabase إلى شكل Product (يدعم المتغيرات الجديدة)
+const mapSupabaseProduct = (data: any): Product => {
+    // تحويل المتغيرات من JSONB إلى مصفوفة Variant
+    let variants: Variant[] = [];
+    if (data.variants && Array.isArray(data.variants)) {
+        variants = data.variants.map((v: any) => ({
+            id: v.id || Date.now().toString(),
+            name: v.name,
+            options: (v.options || []).map((opt: any) => ({
+                name: opt.name,
+                stock: opt.stock || 0,
+                extraPrice: opt.extraPrice || 0
+            }))
+        }));
+    }
+
+    return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: data.price,
+        cost_price: data.cost_price,
+        image: data.image || '/images/placeholder.jpg',
+        images: data.images || [],
+        categories: data.categories || [],
+        discount: data.discount || 0,
+        discount_end_date: data.discount_end_date || null,
+        freeShipping: data.free_shipping || false,
+        free_shipping_end_date: data.free_shipping_end_date || null,
+        offer: data.offer || false,
+        featured: data.featured || false,
+        recommended: data.recommended || false,
+        stock: data.stock || 0,
+        variants: variants,
+        relatedProducts: data.related_products || []
+    };
+}
 
 // ✅ تحويل Product إلى شكل Supabase
 const toSupabaseProduct = (product: Partial<Product>) => ({
@@ -87,6 +121,7 @@ const toSupabaseProduct = (product: Partial<Product>) => ({
     name: product.name,
     description: product.description,
     price: product.price,
+    cost_price: product.cost_price,
     image: product.image,
     images: product.images || [],
     categories: product.categories || [],
@@ -200,7 +235,7 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 
 // ============ دوال الإدارة (Admin) ============
 
-// ✅ إضافة منتج جديد (معدل لإرسال إشعار إلى n8n)
+// ✅ إضافة منتج جديد
 export async function addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
     // الحصول على أقصى ID + 1
     const { data: maxIdData } = await supabase
@@ -287,14 +322,12 @@ export async function searchProducts(query: string): Promise<Product[]> {
 
 // ✅ جلب المنتجات ذات الصلة
 export async function getRelatedProducts(productId: number): Promise<Product[]> {
-    // أولاً جلب المنتج الحالي
     const product = await getProductById(productId)
 
     if (!product || !product.relatedProducts || product.relatedProducts.length === 0) {
         return []
     }
 
-    // جلب المنتجات ذات الصلة
     const { data, error } = await supabase
         .from('products')
         .select('*')

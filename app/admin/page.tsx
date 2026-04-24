@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
-import { Product, getAllProducts, addProduct, updateProduct, deleteProduct } from '@/app/lib/products';
+import { Product, getAllProducts, addProduct, updateProduct, deleteProduct, Variant } from '@/app/lib/products';
 import ImageUploader from '@/app/components/ImageUploader';
 import Link from 'next/link';
 import { useToast } from '@/app/components/Toast';
@@ -24,6 +24,65 @@ export default function AdminPage() {
     const { showToast } = useToast();
     const router = useRouter();
 
+    // ============ دوال المتغيرات الجديدة ============
+    const [variants, setVariants] = useState<Variant[]>([]);
+
+    const addNewVariant = () => {
+        setVariants([
+            ...variants,
+            {
+                id: Date.now().toString(),
+                name: '',
+                options: []
+            }
+        ]);
+    };
+
+    const removeVariant = (index: number) => {
+        setVariants(variants.filter((_, i) => i !== index));
+    };
+
+    const updateVariantName = (index: number, name: string) => {
+        const newVariants = [...variants];
+        newVariants[index].name = name;
+        setVariants(newVariants);
+    };
+
+    const addOptionToVariant = (variantIndex: number) => {
+        const newVariants = [...variants];
+        newVariants[variantIndex].options.push({
+            name: '',
+            stock: 0,
+            extraPrice: 0
+        });
+        setVariants(newVariants);
+    };
+
+    const removeOptionFromVariant = (variantIndex: number, optionIndex: number) => {
+        const newVariants = [...variants];
+        newVariants[variantIndex].options = newVariants[variantIndex].options.filter((_, i) => i !== optionIndex);
+        setVariants(newVariants);
+    };
+
+    const updateOptionName = (variantIndex: number, optionIndex: number, name: string) => {
+        const newVariants = [...variants];
+        newVariants[variantIndex].options[optionIndex].name = name;
+        setVariants(newVariants);
+    };
+
+    const updateOptionStock = (variantIndex: number, optionIndex: number, stock: number) => {
+        const newVariants = [...variants];
+        newVariants[variantIndex].options[optionIndex].stock = stock;
+        setVariants(newVariants);
+    };
+
+    const updateOptionExtraPrice = (variantIndex: number, optionIndex: number, extraPrice: number) => {
+        const newVariants = [...variants];
+        newVariants[variantIndex].options[optionIndex].extraPrice = extraPrice;
+        setVariants(newVariants);
+    };
+
+    // ============ باقي الحالات والدوال ============
     useEffect(() => {
         checkUser();
     }, []);
@@ -72,9 +131,6 @@ export default function AdminPage() {
         categories: [] as string[],
         description: '',
         costPrice: '',
-        hasVariants: false,
-        variantName: '',
-        variantOptions: '',
         relatedProducts: '',
     });
 
@@ -112,11 +168,9 @@ export default function AdminPage() {
             categories: [],
             description: '',
             costPrice: '',
-            hasVariants: false,
-            variantName: '',
-            variantOptions: '',
             relatedProducts: '',
         });
+        setVariants([]);
         setEditingProduct(null);
         setShowAdvanced(false);
     };
@@ -149,13 +203,6 @@ export default function AdminPage() {
             images.push(...additional);
         }
 
-        const variants = formData.hasVariants && formData.variantName && formData.variantOptions
-            ? [{
-                name: formData.variantName,
-                options: formData.variantOptions.split(',').map(opt => opt.trim())
-            }]
-            : undefined;
-
         const relatedProducts = formData.relatedProducts
             ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
             : undefined;
@@ -181,18 +228,19 @@ export default function AdminPage() {
         };
 
         try {
+            let result;
             if (editingProduct) {
-                const updated = await updateProduct(editingProduct.id, productData);
-                if (updated) {
-                    setProductList(prev => prev.map(p => p.id === editingProduct.id ? updated : p));
+                result = await updateProduct(editingProduct.id, productData);
+                if (result) {
+                    await loadProducts();
                     showToast('تم تحديث المنتج بنجاح', 'success');
                 } else {
                     showToast('حدث خطأ في تحديث المنتج', 'error');
                 }
             } else {
-                const newProduct = await addProduct(productData);
-                if (newProduct) {
-                    setProductList(prev => [...prev, newProduct]);
+                result = await addProduct(productData);
+                if (result) {
+                    await loadProducts();
                     showToast('تم إضافة المنتج بنجاح', 'success');
                 } else {
                     showToast('حدث خطأ في إضافة المنتج', 'error');
@@ -227,11 +275,9 @@ export default function AdminPage() {
             categories: product.categories || [],
             description: product.description || '',
             costPrice: product.cost_price?.toString() || '',
-            hasVariants: !!product.variants,
-            variantName: product.variants?.[0]?.name || '',
-            variantOptions: product.variants?.[0]?.options.join('، ') || '',
             relatedProducts: product.relatedProducts?.join('، ') || '',
         });
+        setVariants(product.variants || []);
         setShowForm(true);
     };
 
@@ -372,6 +418,7 @@ export default function AdminPage() {
 
                             {showAdvanced && (
                                 <div className="space-y-4">
+                                    {/* الصورة الرئيسية */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">الصورة الرئيسية</label>
                                         <div className="flex flex-col sm:flex-row gap-2">
@@ -382,6 +429,7 @@ export default function AdminPage() {
                                         </div>
                                     </div>
 
+                                    {/* صور إضافية */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">صور إضافية</label>
                                         <input type="text" name="additionalImages" value={formData.additionalImages} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none text-sm mb-2" placeholder="روابط مفصولة بفواصل" />
@@ -414,11 +462,13 @@ export default function AdminPage() {
                                         )}
                                     </div>
 
+                                    {/* الوصف */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">الوصف</label>
                                         <textarea name="description" value={formData.description} onChange={handleInputChange} rows={3} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none"></textarea>
                                     </div>
 
+                                    {/* التصنيفات */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">التصنيفات</label>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-black border border-gray-800">
@@ -434,30 +484,126 @@ export default function AdminPage() {
                                         </div>
                                     </div>
 
+                                    {/* سعر التكلفة */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">سعر التكلفة (اختياري)</label>
                                         <input type="number" step="0.01" name="costPrice" value={formData.costPrice} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" placeholder="لحساب الربح" />
                                     </div>
 
+                                    {/* ===== قسم المتغيرات الجديد المتقدم ===== */}
                                     <div className="border-t border-gray-800 pt-4">
-                                        <label className="flex items-center gap-2 text-gray-400 mb-4">
-                                            <input type="checkbox" name="hasVariants" checked={formData.hasVariants} onChange={handleInputChange} className="w-4 h-4" />
-                                            هذا المنتج له متغيرات (ألوان، مقاسات)
-                                        </label>
-                                        {formData.hasVariants && (
-                                            <div className="space-y-4 mr-6">
-                                                <div>
-                                                    <label className="block text-gray-400 text-sm mb-2">اسم المتغير</label>
-                                                    <input type="text" name="variantName" value={formData.variantName} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" placeholder="مثال: اللون" />
+                                        <div className="flex justify-between items-center mb-4">
+                                            <label className="text-gray-400 text-sm">المتغيرات (ألوان، مقاسات، مواد)</label>
+                                            <button
+                                                type="button"
+                                                onClick={addNewVariant}
+                                                className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded hover:bg-amber-700 transition-colors flex items-center gap-1"
+                                            >
+                                                <span>+</span> إضافة متغير
+                                            </button>
+                                        </div>
+
+                                        {variants.length === 0 && (
+                                            <p className="text-gray-500 text-xs text-center py-4">لا توجد متغيرات. أضف متغيراً أولاً.</p>
+                                        )}
+
+                                        {variants.map((variant, vIdx) => (
+                                            <div key={variant.id} className="bg-gray-900/50 border border-gray-800 p-4 rounded-lg mb-4">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <div className="flex-1">
+                                                        <input
+                                                            type="text"
+                                                            value={variant.name}
+                                                            onChange={(e) => updateVariantName(vIdx, e.target.value)}
+                                                            className="w-64 px-3 py-2 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
+                                                            placeholder="اسم المتغير (مثال: اللون، المقاس)"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeVariant(vIdx)}
+                                                        className="text-red-500 hover:text-red-400 transition-colors"
+                                                    >
+                                                        🗑️ حذف المتغير
+                                                    </button>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-gray-400 text-sm mb-2">الخيارات</label>
-                                                    <input type="text" name="variantOptions" value={formData.variantOptions} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" placeholder="مثال: أسود، أحمر، أزرق" />
+
+                                                <div className="mr-4">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <label className="text-gray-400 text-xs">الخيارات والكميات</label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => addOptionToVariant(vIdx)}
+                                                            className="px-2 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 transition-colors flex items-center gap-1"
+                                                        >
+                                                            <span>+</span> إضافة خيار
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full">
+                                                            <thead>
+                                                                <tr className="text-gray-500 text-xs">
+                                                                    <th className="text-right py-1 px-2">الخيار</th>
+                                                                    <th className="text-right py-1 px-2">الكمية</th>
+                                                                    <th className="text-right py-1 px-2">سعر إضافي (JD)</th>
+                                                                    <th className="text-right py-1 px-2"></th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {variant.options.map((opt, oIdx) => (
+                                                                    <tr key={oIdx}>
+                                                                        <td className="py-1 px-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                value={opt.name}
+                                                                                onChange={(e) => updateOptionName(vIdx, oIdx, e.target.value)}
+                                                                                className="w-24 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
+                                                                                placeholder="أحمر"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="py-1 px-2">
+                                                                            <input
+                                                                                type="number"
+                                                                                value={opt.stock}
+                                                                                onChange={(e) => updateOptionStock(vIdx, oIdx, parseInt(e.target.value) || 0)}
+                                                                                className="w-20 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
+                                                                                placeholder="0"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="py-1 px-2">
+                                                                            <input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                value={opt.extraPrice}
+                                                                                onChange={(e) => updateOptionExtraPrice(vIdx, oIdx, parseFloat(e.target.value) || 0)}
+                                                                                className="w-20 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
+                                                                                placeholder="0.00"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="py-1 px-2">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => removeOptionFromVariant(vIdx, oIdx)}
+                                                                                className="text-red-500 hover:text-red-400 text-sm"
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    <div className="mt-2 text-right text-gray-500 text-xs">
+                                                        إجمالي كمية هذا المتغير: {variant.options.reduce((sum, opt) => sum + opt.stock, 0)} قطعة
+                                                    </div>
                                                 </div>
                                             </div>
-                                        )}
+                                        ))}
                                     </div>
 
+                                    {/* منتجات مقترحة */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">منتجات مقترحة</label>
                                         <input type="text" name="relatedProducts" value={formData.relatedProducts} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" placeholder="مثال: 2, 4, 6" />
