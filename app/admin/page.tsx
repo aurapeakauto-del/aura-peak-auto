@@ -262,17 +262,14 @@ export default function AdminPage() {
             relatedProducts: relatedProducts,
         };
 
-        console.log('🔍 vehicleFitments array:', vehicleFitments);
-        console.log('🔍 vehicleFitments length:', vehicleFitments.length);
-        console.log('🔍 productData.vehicle_fitments:', productData.vehicle_fitments);
-
+        console.log('🚀 [DEBUG] vehicleFitments BEFORE send:', JSON.stringify(vehicleFitments, null, 2));
+        
         try {
             let result;
             if (editingProduct) {
                 result = await updateProduct(editingProduct.id, productData);
 
-                console.log('✅ نتيجة الحفظ من Supabase:', result);
-                console.log('✅ vehicle_fitments في النتيجة:', result?.vehicleFitments);
+                console.log('📦 [DEBUG] productData FULL:', JSON.stringify(productData, null, 2));
 
                 if (result) {
                     await loadProducts();
