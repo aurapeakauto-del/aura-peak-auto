@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
-import { Product, getAllProducts, addProduct, updateProduct, deleteProduct, Variant } from '@/app/lib/products';
+import { Product, getAllProducts, addProduct, updateProduct, deleteProduct, Variant, VehicleFitment, getTotalStockFromVariants, getTotalStockFromVehicleFitments } from '@/app/lib/products';
 import ImageUploader from '@/app/components/ImageUploader';
 import Link from 'next/link';
 import { useToast } from '@/app/components/Toast';
@@ -24,7 +24,7 @@ export default function AdminPage() {
     const { showToast } = useToast();
     const router = useRouter();
 
-    // ============ دوال المتغيرات الجديدة ============
+    // ============ دوال المتغيرات ============
     const [variants, setVariants] = useState<Variant[]>([]);
 
     const addNewVariant = () => {
@@ -80,6 +80,34 @@ export default function AdminPage() {
         const newVariants = [...variants];
         newVariants[variantIndex].options[optionIndex].extraPrice = extraPrice;
         setVariants(newVariants);
+    };
+
+    // ============ دوال توافق المركبات (Vehicle Fitments) ============
+    const [vehicleFitments, setVehicleFitments] = useState<VehicleFitment[]>([]);
+
+    const addVehicleFitment = () => {
+        setVehicleFitments([
+            ...vehicleFitments,
+            {
+                id: Date.now().toString(),
+                make: '',
+                model: '',
+                year: new Date().getFullYear(),
+                stock: 0,
+                extraPrice: 0,
+                image: ''
+            }
+        ]);
+    };
+
+    const removeVehicleFitment = (index: number) => {
+        setVehicleFitments(vehicleFitments.filter((_, i) => i !== index));
+    };
+
+    const updateVehicleFitment = (index: number, field: keyof VehicleFitment, value: any) => {
+        const newFitments = [...vehicleFitments];
+        newFitments[index] = { ...newFitments[index], [field]: value };
+        setVehicleFitments(newFitments);
     };
 
     // ============ باقي الحالات والدوال ============
@@ -171,6 +199,7 @@ export default function AdminPage() {
             relatedProducts: '',
         });
         setVariants([]);
+        setVehicleFitments([]);
         setEditingProduct(null);
         setShowAdvanced(false);
     };
@@ -210,12 +239,17 @@ export default function AdminPage() {
         const discountEndDate = calculateEndDate(formData.discountEndType, formData.discountEndDate, formData.discountDays);
         const freeShippingEndDate = calculateEndDate(formData.freeShippingEndType, formData.freeShippingEndDate, formData.freeShippingDays);
 
+        // حساب المخزون الإجمالي من المتغيرات وتوافق المركبات
+        const variantsStock = getTotalStockFromVariants(variants);
+        const fitmentsStock = getTotalStockFromVehicleFitments(vehicleFitments);
+        const totalStock = parseInt(formData.stock) + variantsStock + fitmentsStock;
+
         const productData: any = {
             name: formData.name,
             description: formData.description || '',
             price: parseFloat(formData.price),
             cost_price: formData.costPrice ? parseFloat(formData.costPrice) : 0,
-            stock: parseInt(formData.stock) || 0,
+            stock: totalStock,
             image: formData.image || '/images/placeholder.jpg',
             images: images.filter(img => img !== ''),
             categories: formData.categories,
@@ -224,6 +258,7 @@ export default function AdminPage() {
             freeShipping: formData.freeShipping,
             free_shipping_end_date: freeShippingEndDate,
             variants: variants,
+            vehicle_fitments: vehicleFitments,
             relatedProducts: relatedProducts,
         };
 
@@ -278,6 +313,7 @@ export default function AdminPage() {
             relatedProducts: product.relatedProducts?.join('، ') || '',
         });
         setVariants(product.variants || []);
+        setVehicleFitments(product.vehicleFitments || []);
         setShowForm(true);
     };
 
@@ -335,7 +371,6 @@ export default function AdminPage() {
                         </button>
                     </div>
                 </div>
-
                 {showForm && (
                     <div className="bg-black border border-gray-800 p-4 sm:p-6 mb-8">
                         <h2 className="text-xl font-light mb-6">{editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h2>
@@ -350,8 +385,9 @@ export default function AdminPage() {
                                     <input type="number" step="0.01" name="price" value={formData.price} onChange={handleInputChange} required className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="block text-gray-400 text-sm mb-2">الكمية المتوفرة</label>
-                                    <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} required className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" />
+                                    <label className="block text-gray-400 text-sm mb-2">المخزون الأساسي</label>
+                                    <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" placeholder="أضف كميات المتغيرات أدناه" />
+                                    <p className="text-gray-500 text-xs mt-1">سيتم إضافة كميات المتغيرات والتوافقات تلقائياً</p>
                                 </div>
                                 <div>
                                     <label className="block text-gray-400 text-sm mb-2">نسبة الخصم (%)</label>
@@ -490,15 +526,11 @@ export default function AdminPage() {
                                         <input type="number" step="0.01" name="costPrice" value={formData.costPrice} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" placeholder="لحساب الربح" />
                                     </div>
 
-                                    {/* ===== قسم المتغيرات الجديد المتقدم ===== */}
+                                    {/* ===== قسم المتغيرات ===== */}
                                     <div className="border-t border-gray-800 pt-4">
                                         <div className="flex justify-between items-center mb-4">
                                             <label className="text-gray-400 text-sm">المتغيرات (ألوان، مقاسات، مواد)</label>
-                                            <button
-                                                type="button"
-                                                onClick={addNewVariant}
-                                                className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded hover:bg-amber-700 transition-colors flex items-center gap-1"
-                                            >
+                                            <button type="button" onClick={addNewVariant} className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded hover:bg-amber-700 transition-colors flex items-center gap-1">
                                                 <span>+</span> إضافة متغير
                                             </button>
                                         </div>
@@ -511,35 +543,17 @@ export default function AdminPage() {
                                             <div key={variant.id} className="bg-gray-900/50 border border-gray-800 p-4 rounded-lg mb-4">
                                                 <div className="flex justify-between items-center mb-3">
                                                     <div className="flex-1">
-                                                        <input
-                                                            type="text"
-                                                            value={variant.name}
-                                                            onChange={(e) => updateVariantName(vIdx, e.target.value)}
-                                                            className="w-64 px-3 py-2 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
-                                                            placeholder="اسم المتغير (مثال: اللون، المقاس)"
-                                                        />
+                                                        <input type="text" value={variant.name} onChange={(e) => updateVariantName(vIdx, e.target.value)} className="w-64 px-3 py-2 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="اسم المتغير (مثال: اللون، المقاس)" />
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeVariant(vIdx)}
-                                                        className="text-red-500 hover:text-red-400 transition-colors"
-                                                    >
-                                                        🗑️ حذف المتغير
-                                                    </button>
+                                                    <button type="button" onClick={() => removeVariant(vIdx)} className="text-red-500 hover:text-red-400 transition-colors">🗑️ حذف المتغير</button>
                                                 </div>
-
                                                 <div className="mr-4">
                                                     <div className="flex justify-between items-center mb-2">
                                                         <label className="text-gray-400 text-xs">الخيارات والكميات</label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => addOptionToVariant(vIdx)}
-                                                            className="px-2 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 transition-colors flex items-center gap-1"
-                                                        >
+                                                        <button type="button" onClick={() => addOptionToVariant(vIdx)} className="px-2 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 transition-colors flex items-center gap-1">
                                                             <span>+</span> إضافة خيار
                                                         </button>
                                                     </div>
-
                                                     <div className="overflow-x-auto">
                                                         <table className="w-full">
                                                             <thead>
@@ -554,41 +568,16 @@ export default function AdminPage() {
                                                                 {variant.options.map((opt, oIdx) => (
                                                                     <tr key={oIdx}>
                                                                         <td className="py-1 px-2">
-                                                                            <input
-                                                                                type="text"
-                                                                                value={opt.name}
-                                                                                onChange={(e) => updateOptionName(vIdx, oIdx, e.target.value)}
-                                                                                className="w-24 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
-                                                                                placeholder="أحمر"
-                                                                            />
+                                                                            <input type="text" value={opt.name} onChange={(e) => updateOptionName(vIdx, oIdx, e.target.value)} className="w-24 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="أحمر" />
                                                                         </td>
                                                                         <td className="py-1 px-2">
-                                                                            <input
-                                                                                type="number"
-                                                                                value={opt.stock}
-                                                                                onChange={(e) => updateOptionStock(vIdx, oIdx, parseInt(e.target.value) || 0)}
-                                                                                className="w-20 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
-                                                                                placeholder="0"
-                                                                            />
+                                                                            <input type="number" value={opt.stock} onChange={(e) => updateOptionStock(vIdx, oIdx, parseInt(e.target.value) || 0)} className="w-20 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="0" />
                                                                         </td>
                                                                         <td className="py-1 px-2">
-                                                                            <input
-                                                                                type="number"
-                                                                                step="0.01"
-                                                                                value={opt.extraPrice}
-                                                                                onChange={(e) => updateOptionExtraPrice(vIdx, oIdx, parseFloat(e.target.value) || 0)}
-                                                                                className="w-20 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded"
-                                                                                placeholder="0.00"
-                                                                            />
+                                                                            <input type="number" step="0.01" value={opt.extraPrice} onChange={(e) => updateOptionExtraPrice(vIdx, oIdx, parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="0.00" />
                                                                         </td>
                                                                         <td className="py-1 px-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => removeOptionFromVariant(vIdx, oIdx)}
-                                                                                className="text-red-500 hover:text-red-400 text-sm"
-                                                                            >
-                                                                                ✕
-                                                                            </button>
+                                                                            <button type="button" onClick={() => removeOptionFromVariant(vIdx, oIdx)} className="text-red-500 hover:text-red-400 text-sm">✕</button>
                                                                         </td>
                                                                     </tr>
                                                                 ))}
@@ -601,6 +590,62 @@ export default function AdminPage() {
                                                 </div>
                                             </div>
                                         ))}
+                                    </div>
+
+                                    {/* ===== قسم توافق المركبات الجديد (Vehicle Fitments) ===== */}
+                                    <div className="border-t border-gray-800 pt-4">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <label className="text-gray-400 text-sm">توافق المركبات (حسب نوع السيارة)</label>
+                                            <button type="button" onClick={addVehicleFitment} className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded hover:bg-amber-700 transition-colors flex items-center gap-1">
+                                                <span>+</span> إضافة توافق
+                                            </button>
+                                        </div>
+
+                                        {vehicleFitments.length === 0 && (
+                                            <p className="text-gray-500 text-xs text-center py-4">لا توجد توافقات. أضف توافقاً أولاً.</p>
+                                        )}
+
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead>
+                                                    <tr className="text-gray-500 text-xs">
+                                                        <th className="text-right py-2 px-2">الماركة</th>
+                                                        <th className="text-right py-2 px-2">الموديل</th>
+                                                        <th className="text-right py-2 px-2">السنة</th>
+                                                        <th className="text-right py-2 px-2">الكمية</th>
+                                                        <th className="text-right py-2 px-2">سعر إضافي (JD)</th>
+                                                        <th className="text-right py-2 px-2"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {vehicleFitments.map((fitment, idx) => (
+                                                        <tr key={fitment.id}>
+                                                            <td className="py-2 px-2">
+                                                                <input type="text" value={fitment.make} onChange={(e) => updateVehicleFitment(idx, 'make', e.target.value)} className="w-28 px-2 py-1.5 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="BMW" />
+                                                            </td>
+                                                            <td className="py-2 px-2">
+                                                                <input type="text" value={fitment.model} onChange={(e) => updateVehicleFitment(idx, 'model', e.target.value)} className="w-28 px-2 py-1.5 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="X5" />
+                                                            </td>
+                                                            <td className="py-2 px-2">
+                                                                <input type="number" value={fitment.year} onChange={(e) => updateVehicleFitment(idx, 'year', parseInt(e.target.value) || new Date().getFullYear())} className="w-24 px-2 py-1.5 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="2020" />
+                                                            </td>
+                                                            <td className="py-2 px-2">
+                                                                <input type="number" value={fitment.stock} onChange={(e) => updateVehicleFitment(idx, 'stock', parseInt(e.target.value) || 0)} className="w-20 px-2 py-1.5 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="0" />
+                                                            </td>
+                                                            <td className="py-2 px-2">
+                                                                <input type="number" step="0.01" value={fitment.extraPrice} onChange={(e) => updateVehicleFitment(idx, 'extraPrice', parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1.5 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none text-sm rounded" placeholder="0.00" />
+                                                            </td>
+                                                            <td className="py-2 px-2">
+                                                                <button type="button" onClick={() => removeVehicleFitment(idx)} className="text-red-500 hover:text-red-400 text-sm">✕</button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="mt-2 text-right text-gray-500 text-xs">
+                                            إجمالي كمية التوافقات: {vehicleFitments.reduce((sum, f) => sum + f.stock, 0)} قطعة
+                                        </div>
                                     </div>
 
                                     {/* منتجات مقترحة */}

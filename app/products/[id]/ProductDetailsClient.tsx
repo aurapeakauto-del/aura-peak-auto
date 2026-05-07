@@ -7,9 +7,17 @@ import { useCart } from '@/app/context/CartContext';
 import { getProductById, getRelatedProducts, Product } from '@/app/lib/products';
 import Ratings from '@/app/components/Ratings';
 import { useToast } from '@/app/components/Toast';
+import VehicleFitmentSelector from './VehicleFitmentSelector';
 
 interface Props {
     id: number;
+}
+
+// تعريف نوع لعنصر المتغير مع السعر الإضافي
+interface SelectedVariant {
+    variant: string;
+    quantity: number;
+    extraPrice: number;
 }
 
 export default function ProductDetailsClient({ id }: Props) {
@@ -37,8 +45,8 @@ export default function ProductDetailsClient({ id }: Props) {
     const [quantity, setQuantity] = useState(1);
     const [showFullDescription, setShowFullDescription] = useState(false);
 
-    // تخزين الكميات المختارة للمتغيرات
-    const [selectedVariantQuantities, setSelectedVariantQuantities] = useState<Record<string, number>>({});
+    // ✅ تخزين الخيارات المختارة مع الكميات والأسعار الإضافية
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, SelectedVariant>>({});
 
     useEffect(() => {
         loadProduct();
@@ -71,12 +79,13 @@ export default function ProductDetailsClient({ id }: Props) {
         }
     };
 
-    // ✅ حساب السعر النهائي مع السعر الإضافي للمتغير (إن وجد)
-    const calculateFinalPrice = (basePrice: number, extraPrice: number = 0) => {
-        return basePrice + extraPrice;
-    };
+    const [selectedFitment, setSelectedFitment] = useState<{
+        fitment: VehicleFitment;
+        quantity: number;
+        finalPrice: number;
+    } | null>(null);
 
-    // ✅ حساب السعر بعد الخصم
+    // ✅ حساب السعر النهائي مع الخصم والسعر الإضافي
     const getDiscountedPrice = (price: number) => {
         if (product?.discount) {
             return price - (price * product.discount / 100);
@@ -84,34 +93,75 @@ export default function ProductDetailsClient({ id }: Props) {
         return price;
     };
 
+    const baseDiscountedPrice = product ? getDiscountedPrice(product.price) : 0;
+
     // ✅ إضافة منتج بمتغيرات متعددة إلى السلة
     const handleAddToCart = () => {
         if (!product) return;
 
-        // منتج بدون متغيرات
-        if (!product.variants || product.variants.length === 0) {
+        // ✅ 1. منتج بدون متغيرات ولا توافقات
+        if ((!product.variants || product.variants.length === 0) &&
+            (!product.vehicleFitments || product.vehicleFitments.length === 0)) {
             addMultipleToCart(product, [{ variant: '', quantity }]);
             showToast(`تمت إضافة ${quantity} قطع إلى السلة`, 'success');
             return;
         }
 
-        // منتج بمتغيرات - تجميع الخيارات المختارة مع الكميات
-        const variantsList = Object.entries(selectedVariantQuantities)
-            .map(([key, qty]) => {
-                if (qty === 0) return null;
-                const variantName = key.split('-')[1];
-                return { variant: variantName, quantity: qty };
-            })
-            .filter(item => item !== null) as { variant: string; quantity: number }[];
+        // ✅ 2. منتج بمتغيرات (ألوان، مقاسات)
+        const variantsList = Object.values(selectedVariants)
+            .filter(v => v.quantity > 0)
+            .map(({ variant, quantity, extraPrice }) => ({
+                variant,
+                quantity,
+                extraPrice
+            }));
 
-        if (variantsList.length === 0) {
+        // ✅ 3. منتج بتوافق مركبات (جديد)
+        const fitmentList = selectedFitment && selectedFitment.quantity > 0 ? [{
+            variant: `${selectedFitment.fitment.make} ${selectedFitment.fitment.model} (${selectedFitment.fitment.year})`,
+            quantity: selectedFitment.quantity,
+            extraPrice: selectedFitment.fitment.extraPrice
+        }] : [];
+
+        // ✅ دمج القائمتين
+        const allItems = [...variantsList, ...fitmentList];
+
+        if (allItems.length === 0) {
             showToast('الرجاء اختيار كمية واحدة على الأقل', 'warning');
             return;
         }
 
-        addMultipleToCart(product, variantsList);
-        setSelectedVariantQuantities({});
+        addMultipleToCart(product, allItems);
+        setSelectedVariants({});
+        setSelectedFitment(null); // ✅ إعادة تعيين اختيار السيارة
         showToast('تمت إضافة المنتجات إلى السلة', 'success');
+    };
+
+    // ✅ تحديث كمية خيار معين
+    const updateVariantQuantity = (variantKey: string, optionName: string, extraPrice: number, delta: number, maxStock: number) => {
+        setSelectedVariants(prev => {
+            const current = prev[variantKey];
+            const newQuantity = (current?.quantity || 0) + delta;
+
+            if (newQuantity <= 0) {
+                const { [variantKey]: _, ...rest } = prev;
+                return rest;
+            }
+
+            if (newQuantity <= maxStock) {
+                return {
+                    ...prev,
+                    [variantKey]: {
+                        variant: optionName,
+                        quantity: newQuantity,
+                        extraPrice
+                    }
+                };
+            } else {
+                showToast(`الكمية المتوفرة هي ${maxStock} قطع`, 'warning');
+                return prev;
+            }
+        });
     };
 
     const shareProduct = (platform: string) => {
@@ -164,10 +214,12 @@ export default function ProductDetailsClient({ id }: Props) {
         );
     }
 
-    const baseDiscountedPrice = getDiscountedPrice(product.price);
     const descriptionLines = product.description.split('\n');
     const shortDescription = descriptionLines.slice(0, 3).join('\n');
     const hasMoreLines = descriptionLines.length > 3;
+
+    // حساب السعر المعروض (قد يتغير حسب المتغيرات)
+    const displayPrice = baseDiscountedPrice;
 
     return (
         <div className="min-h-screen bg-[#faf7f2]">
@@ -252,7 +304,7 @@ export default function ProductDetailsClient({ id }: Props) {
                             {product.discount ? (
                                 <div className="flex items-baseline gap-3">
                                     <span className="text-3xl text-[#2c2c2c] font-semibold">
-                                        JD {baseDiscountedPrice.toFixed(2)}
+                                        JD {displayPrice.toFixed(2)}
                                     </span>
                                     <span className="text-lg text-gray-500 line-through">
                                         JD {product.price.toFixed(2)}
@@ -263,7 +315,7 @@ export default function ProductDetailsClient({ id }: Props) {
                                 </div>
                             ) : (
                                 <span className="text-3xl text-[#2c2c2c] font-semibold">
-                                    JD {product.price.toFixed(2)}
+                                    JD {displayPrice.toFixed(2)}
                                 </span>
                             )}
                         </div>
@@ -306,7 +358,7 @@ export default function ProductDetailsClient({ id }: Props) {
                             {product.recommended && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded">✅ موصى به</span>}
                         </div>
 
-                        {/* ===== قسم المتغيرات الجديد للزبون ===== */}
+                        {/* ===== قسم المتغيرات للزبون ===== */}
                         {product.variants && product.variants.length > 0 ? (
                             <div className="mb-8 space-y-6">
                                 {product.variants.map((variant) => (
@@ -315,35 +367,25 @@ export default function ProductDetailsClient({ id }: Props) {
                                         <div className="space-y-3">
                                             {variant.options.map((option) => {
                                                 const variantKey = `${variant.name}-${option.name}`;
-                                                const qty = selectedVariantQuantities[variantKey] || 0;
-                                                const finalPrice = calculateFinalPrice(baseDiscountedPrice, option.extraPrice);
+                                                const selected = selectedVariants[variantKey];
+                                                const qty = selected?.quantity || 0;
+                                                const finalPrice = baseDiscountedPrice + option.extraPrice;
 
                                                 return (
-                                                    <div key={option.name} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
-                                                        <div>
+                                                    <div key={option.name} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0 flex-wrap sm:flex-nowrap gap-2">
+                                                        <div className="flex flex-wrap items-center gap-2">
                                                             <span className="text-[#2c2c2c] text-sm">{option.name}</span>
                                                             {option.extraPrice !== 0 && (
-                                                                <span className="text-xs text-amber-600 mr-2">
+                                                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${option.extraPrice > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                                                                     {option.extraPrice > 0 ? `+ JD ${option.extraPrice}` : `- JD ${Math.abs(option.extraPrice)}`}
                                                                 </span>
                                                             )}
-                                                            <span className="text-gray-400 text-xs mr-2">(متوفر: {option.stock})</span>
+                                                            <span className="text-gray-400 text-xs">(متوفر: {option.stock})</span>
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                             <button
-                                                                onClick={() => {
-                                                                    if (qty > 0) {
-                                                                        setSelectedVariantQuantities(prev => ({
-                                                                            ...prev,
-                                                                            [variantKey]: qty - 1
-                                                                        }));
-                                                                    } else {
-                                                                        const newQuantities = { ...selectedVariantQuantities };
-                                                                        delete newQuantities[variantKey];
-                                                                        setSelectedVariantQuantities(newQuantities);
-                                                                    }
-                                                                }}
-                                                                className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
+                                                                onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, -1, option.stock)}
+                                                                className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded disabled:opacity-50"
                                                                 disabled={qty === 0}
                                                             >
                                                                 −
@@ -352,16 +394,7 @@ export default function ProductDetailsClient({ id }: Props) {
                                                                 {qty}
                                                             </span>
                                                             <button
-                                                                onClick={() => {
-                                                                    if (qty < option.stock) {
-                                                                        setSelectedVariantQuantities(prev => ({
-                                                                            ...prev,
-                                                                            [variantKey]: qty + 1
-                                                                        }));
-                                                                    } else {
-                                                                        showToast(`الكمية المتوفرة من ${option.name} هي ${option.stock} قطع`, 'warning');
-                                                                    }
-                                                                }}
+                                                                onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, 1, option.stock)}
                                                                 className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
                                                                 disabled={qty >= option.stock}
                                                             >
@@ -376,12 +409,12 @@ export default function ProductDetailsClient({ id }: Props) {
                                 ))}
 
                                 {/* إجمالي الكمية المختارة للمتغيرات */}
-                                {Object.values(selectedVariantQuantities).reduce((a, b) => a + b, 0) > 0 && (
+                                {Object.values(selectedVariants).reduce((a, b) => a + b.quantity, 0) > 0 && (
                                     <div className="mt-4 p-4 bg-gray-100 border border-gray-200 rounded-lg">
-                                        <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-center flex-wrap gap-2">
                                             <span className="text-[#2c2c2c] font-medium">إجمالي القطع المختارة:</span>
                                             <span className="text-[#2c2c2c] text-xl font-semibold">
-                                                {Object.values(selectedVariantQuantities).reduce((a, b) => a + b, 0)}
+                                                {Object.values(selectedVariants).reduce((a, b) => a + b.quantity, 0)}
                                             </span>
                                         </div>
                                     </div>
@@ -454,6 +487,15 @@ export default function ProductDetailsClient({ id }: Props) {
                                 )}
                             </div>
                         </div>
+
+                        {product.vehicleFitments && product.vehicleFitments.length > 0 && (
+                            <VehicleFitmentSelector
+                                fitments={product.vehicleFitments}
+                                basePrice={product.price}
+                                discount={product.discount}
+                                onSelect={setSelectedFitment}
+                            />
+                        )}
 
                         {/* زر الإضافة */}
                         {product.stock === 0 ? (

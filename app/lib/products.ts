@@ -1,6 +1,6 @@
 ﻿import { supabase } from './supabase'
 
-// ============ تعريف أنواع المتغيرات الجديدة ============
+// ============ تعريف أنواع المتغيرات ============
 export interface VariantOption {
     name: string;           // اسم الخيار (أحمر، أزرق، كبير، صغير)
     stock: number;          // الكمية المتوفرة لهذا الخيار
@@ -11,6 +11,17 @@ export interface Variant {
     id: string;             // معرف فريد (مؤقت)
     name: string;           // اسم المتغير (اللون، المقاس، المادة)
     options: VariantOption[];
+}
+
+// ============ تعريف نظام توافق المركبات ============
+export interface VehicleFitment {
+    id: string;
+    make: string;           // الماركة (BMW, Mercedes, Toyota)
+    model: string;          // الموديل (X5, GLE, Camry)
+    year: number;           // السنة (2020, 2021)
+    stock: number;          // الكمية المتوفرة لهذا التوافق
+    extraPrice: number;     // سعر إضافي (اختياري)
+    image?: string;         // صورة اختيارية للتوافق
 }
 
 export interface Product {
@@ -30,18 +41,23 @@ export interface Product {
     featured?: boolean;
     recommended?: boolean;
     stock: number;
-    variants: Variant[];      // ✅ تغيير: أصبح مصفوفة Variant
+    variants: Variant[];
+    vehicleFitments: VehicleFitment[];  // ✅ جديد
     relatedProducts?: number[];
 }
 
-// ✅ حساب إجمالي الكمية من المتغيرات (للتحقق)
+// ✅ حساب إجمالي الكمية من المتغيرات
 export function getTotalStockFromVariants(variants: Variant[]): number {
     return variants.reduce((total, variant) => {
         return total + variant.options.reduce((sum, opt) => sum + opt.stock, 0);
     }, 0);
 }
 
-// ✅ إرسال إشعار إلى n8n عند إضافة منتج جديد
+// ✅ حساب إجمالي الكمية من توافق المركبات
+export function getTotalStockFromVehicleFitments(fitments: VehicleFitment[]): number {
+    return fitments.reduce((total, f) => total + f.stock, 0);
+}
+
 async function notifyN8N(product: Product) {
     try {
         const webhookUrl = process.env.N8N_PRODUCT_WEBHOOK_URL;
@@ -77,7 +93,7 @@ async function notifyN8N(product: Product) {
     }
 }
 
-// ✅ تحويل البيانات من Supabase إلى شكل Product (يدعم المتغيرات الجديدة)
+// ✅ تحويل البيانات من Supabase إلى شكل Product
 const mapSupabaseProduct = (data: any): Product => {
     // تحويل المتغيرات من JSONB إلى مصفوفة Variant
     let variants: Variant[] = [];
@@ -90,6 +106,20 @@ const mapSupabaseProduct = (data: any): Product => {
                 stock: opt.stock || 0,
                 extraPrice: opt.extraPrice || 0
             }))
+        }));
+    }
+
+    // تحويل توافق المركبات من JSONB
+    let vehicleFitments: VehicleFitment[] = [];
+    if (data.vehicle_fitments && Array.isArray(data.vehicle_fitments)) {
+        vehicleFitments = data.vehicle_fitments.map((vf: any) => ({
+            id: vf.id || Date.now().toString(),
+            make: vf.make,
+            model: vf.model,
+            year: vf.year,
+            stock: vf.stock || 0,
+            extraPrice: vf.extraPrice || 0,
+            image: vf.image || ''
         }));
     }
 
@@ -111,6 +141,7 @@ const mapSupabaseProduct = (data: any): Product => {
         recommended: data.recommended || false,
         stock: data.stock || 0,
         variants: variants,
+        vehicleFitments: vehicleFitments,
         relatedProducts: data.related_products || []
     };
 }
@@ -134,12 +165,12 @@ const toSupabaseProduct = (product: Partial<Product>) => ({
     recommended: product.recommended || false,
     stock: product.stock || 0,
     variants: product.variants || [],
+    vehicle_fitments: product.vehicleFitments || [],
     related_products: product.relatedProducts || []
 })
 
 // ============ دوال القراءة من Supabase ============
 
-// ✅ جلب جميع المنتجات
 export async function getAllProducts(): Promise<Product[]> {
     const { data, error } = await supabase
         .from('products')
@@ -154,7 +185,6 @@ export async function getAllProducts(): Promise<Product[]> {
     return data.map(mapSupabaseProduct)
 }
 
-// ✅ جلب منتج بواسطة ID
 export async function getProductById(id: number): Promise<Product | null> {
     const { data, error } = await supabase
         .from('products')
@@ -170,7 +200,6 @@ export async function getProductById(id: number): Promise<Product | null> {
     return mapSupabaseProduct(data)
 }
 
-// ✅ جلب المنتجات المميزة (Featured)
 export async function getFeaturedProducts(): Promise<Product[]> {
     const { data, error } = await supabase
         .from('products')
@@ -186,7 +215,6 @@ export async function getFeaturedProducts(): Promise<Product[]> {
     return data.map(mapSupabaseProduct)
 }
 
-// ✅ جلب المنتجات الموصى بها (Recommended)
 export async function getRecommendedProducts(): Promise<Product[]> {
     const { data, error } = await supabase
         .from('products')
@@ -202,7 +230,6 @@ export async function getRecommendedProducts(): Promise<Product[]> {
     return data.map(mapSupabaseProduct)
 }
 
-// ✅ جلب منتجات ذات عرض خاص (Offer)
 export async function getOfferProducts(): Promise<Product[]> {
     const { data, error } = await supabase
         .from('products')
@@ -218,7 +245,6 @@ export async function getOfferProducts(): Promise<Product[]> {
     return data.map(mapSupabaseProduct)
 }
 
-// ✅ جلب منتجات حسب التصنيف
 export async function getProductsByCategory(category: string): Promise<Product[]> {
     const { data, error } = await supabase
         .from('products')
@@ -235,9 +261,7 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 
 // ============ دوال الإدارة (Admin) ============
 
-// ✅ إضافة منتج جديد
 export async function addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
-    // الحصول على أقصى ID + 1
     const { data: maxIdData } = await supabase
         .from('products')
         .select('id')
@@ -263,14 +287,10 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
     }
 
     const newProduct = mapSupabaseProduct(data)
-
-    // 🔔 إرسال إشعار إلى n8n
     await notifyN8N(newProduct);
-
     return newProduct
 }
 
-// ✅ تحديث منتج
 export async function updateProduct(id: number, updates: Partial<Product>): Promise<Product | null> {
     const supabaseUpdates = toSupabaseProduct(updates)
 
@@ -289,7 +309,6 @@ export async function updateProduct(id: number, updates: Partial<Product>): Prom
     return mapSupabaseProduct(data)
 }
 
-// ✅ حذف منتج
 export async function deleteProduct(id: number): Promise<boolean> {
     const { error } = await supabase
         .from('products')
@@ -304,7 +323,6 @@ export async function deleteProduct(id: number): Promise<boolean> {
     return true
 }
 
-// ✅ البحث في المنتجات
 export async function searchProducts(query: string): Promise<Product[]> {
     const { data, error } = await supabase
         .from('products')
@@ -320,7 +338,6 @@ export async function searchProducts(query: string): Promise<Product[]> {
     return data.map(mapSupabaseProduct)
 }
 
-// ✅ جلب المنتجات ذات الصلة
 export async function getRelatedProducts(productId: number): Promise<Product[]> {
     const product = await getProductById(productId)
 

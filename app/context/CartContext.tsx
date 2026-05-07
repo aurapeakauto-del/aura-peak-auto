@@ -6,7 +6,9 @@ import { getProductById } from '@/app/lib/products';
 export interface CartItem {
     id: number;
     name: string;
-    price: number;
+    price: number;        // السعر النهائي للقطعة الواحدة (بعد الخصم + السعر الإضافي)
+    originalPrice: number; // السعر الأصلي قبل أي إضافات
+    extraPrice: number;   // السعر الإضافي للخيار المختار (0 إذا لا يوجد)
     image: string;
     quantity: number;
     discount?: number;
@@ -17,8 +19,8 @@ export interface CartItem {
 
 interface CartContextType {
     items: CartItem[];
-    addToCart: (product: any, quantity: number, variant?: string) => void;
-    addMultipleToCart: (product: any, variants: { variant: string; quantity: number }[]) => void;
+    addToCart: (product: any, quantity: number, variant?: string, extraPrice?: number) => void;
+    addMultipleToCart: (product: any, variants: { variant: string; quantity: number; extraPrice?: number }[]) => void;
     removeFromCart: (productId: number, variant?: string) => void;
     updateQuantity: (productId: number, quantity: number, variant?: string) => void;
     clearCart: () => void;
@@ -55,7 +57,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('auraCart', JSON.stringify(items));
     }, [items]);
 
-    // ✅ دالة جلب المخزون من Supabase مباشرة
     const getProductStock = async (productId: number): Promise<number> => {
         try {
             const product = await getProductById(productId);
@@ -66,12 +67,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const getItemId = (productId: number, variant?: string) => {
-        return variant ? `${productId}-${variant}` : `${productId}`;
+    // ✅ حساب السعر النهائي
+    const calculateFinalPrice = (product: any, extraPrice: number = 0): number => {
+        const discountedPrice = product.discount
+            ? product.price - (product.price * product.discount / 100)
+            : product.price;
+        return discountedPrice + extraPrice;
     };
 
-    const addToCart = async (product: any, quantity: number, variant?: string) => {
-        // ✅ التحقق من المخزون الحالي من Supabase
+    const addToCart = async (product: any, quantity: number, variant?: string, extraPrice: number = 0) => {
         const currentStock = await getProductStock(product.id);
 
         if (currentStock < quantity) {
@@ -82,6 +86,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const displayName = variant
             ? `${product.name} - ${variant}`
             : product.name;
+
+        const finalPrice = calculateFinalPrice(product, extraPrice);
+        const originalPrice = product.price;
 
         setItems(prev => {
             const existing = prev.find(item =>
@@ -106,14 +113,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 );
             }
 
-            const finalPrice = product.discount
-                ? product.price - (product.price * product.discount / 100)
-                : product.price;
-
             return [...prev, {
                 id: product.id,
                 name: displayName,
                 price: finalPrice,
+                originalPrice: originalPrice,
+                extraPrice: extraPrice,
                 image: product.image || '',
                 quantity,
                 discount: product.discount,
@@ -124,8 +129,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
     };
 
-    // ✅ دالة إضافة طلب متعدد (عدة متغيرات دفعة واحدة)
-    const addMultipleToCart = async (product: any, variants: { variant: string; quantity: number }[]) => {
+    const addMultipleToCart = async (product: any, variants: { variant: string; quantity: number; extraPrice?: number }[]) => {
         const selectedVariants = variants.filter(v => v.quantity > 0);
 
         if (selectedVariants.length === 0) {
@@ -134,8 +138,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
 
         const totalQuantity = selectedVariants.reduce((sum, v) => sum + v.quantity, 0);
-
-        // ✅ التحقق من المخزون الحالي من Supabase
         const currentStock = await getProductStock(product.id);
 
         if (currentStock < totalQuantity) {
@@ -143,8 +145,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        selectedVariants.forEach(({ variant, quantity }) => {
+        selectedVariants.forEach(({ variant, quantity, extraPrice = 0 }) => {
             const displayName = `${product.name} - ${variant}`;
+            const finalPrice = calculateFinalPrice(product, extraPrice);
+            const originalPrice = product.price;
 
             setItems(prev => {
                 const existing = prev.find(item =>
@@ -159,14 +163,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
                     );
                 }
 
-                const finalPrice = product.discount
-                    ? product.price - (product.price * product.discount / 100)
-                    : product.price;
-
                 return [...prev, {
                     id: product.id,
                     name: displayName,
                     price: finalPrice,
+                    originalPrice: originalPrice,
+                    extraPrice: extraPrice,
                     image: product.image || '',
                     quantity,
                     discount: product.discount,
@@ -192,7 +194,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        // ✅ التحقق من المخزون الحالي من Supabase
         const availableStock = await getProductStock(productId);
 
         if (quantity > availableStock) {
