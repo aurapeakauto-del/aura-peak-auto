@@ -99,8 +99,8 @@ const mapSupabaseProduct = (data: any): Product => {
     let variants: Variant[] = [];
     if (data.variants && Array.isArray(data.variants)) {
 
-        console.log('🔍 mapSupabaseProduct - data من Supabase:', data);
-        console.log('🔍 data.vehicle_fitments:', data.vehicle_fitments);
+      //  console.log('🔍 mapSupabaseProduct - data من Supabase:', data);
+      //  console.log('🔍 data.vehicle_fitments:', data.vehicle_fitments);
 
         variants = data.variants.map((v: any) => ({
             id: v.id || Date.now().toString(),
@@ -153,7 +153,7 @@ const mapSupabaseProduct = (data: any): Product => {
 // ✅ تحويل Product إلى شكل Supabase
 const toSupabaseProduct = (product: Partial<Product>) => ({
 
-    console.log('🔍 toSupabaseProduct - vehicleFitments المستلمة:', product.vehicleFitments);
+   // console.log('🔍 toSupabaseProduct - vehicleFitments المستلمة:', product.vehicleFitments);
 
     id: product.id,
     name: product.name,
