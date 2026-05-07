@@ -262,6 +262,10 @@ export default function AdminPage() {
             relatedProducts: relatedProducts,
         };
 
+        console.log('🔍 vehicleFitments array:', vehicleFitments);
+        console.log('🔍 vehicleFitments length:', vehicleFitments.length);
+        console.log('🔍 productData.vehicle_fitments:', productData.vehicle_fitments);
+
         try {
             let result;
             if (editingProduct) {
