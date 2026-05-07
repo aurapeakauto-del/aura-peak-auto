@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '@/app/context/CartContext';
-import { getProductById, getRelatedProducts, Product } from '@/app/lib/products';
+import { getProductById, getRelatedProducts, Product, VehicleFitment } from '@/app/lib/products';
 import Ratings from '@/app/components/Ratings';
 import { useToast } from '@/app/components/Toast';
 import VehicleFitmentSelector from './VehicleFitmentSelector';
