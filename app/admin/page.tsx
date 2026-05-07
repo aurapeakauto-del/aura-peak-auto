@@ -270,6 +270,10 @@ export default function AdminPage() {
             let result;
             if (editingProduct) {
                 result = await updateProduct(editingProduct.id, productData);
+
+                console.log('✅ نتيجة الحفظ من Supabase:', result);
+                console.log('✅ vehicle_fitments في النتيجة:', result?.vehicleFitments);
+
                 if (result) {
                     await loadProducts();
                     showToast('تم تحديث المنتج بنجاح', 'success');
