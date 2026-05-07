@@ -261,16 +261,12 @@ export default function AdminPage() {
             vehicle_fitments: vehicleFitments,
             relatedProducts: relatedProducts,
         };
-
-        console.log('🚀 [DEBUG] vehicleFitments BEFORE send:', JSON.stringify(vehicleFitments, null, 2));
         
         try {
             let result;
             if (editingProduct) {
                 result = await updateProduct(editingProduct.id, productData);
-
-                console.log('📦 [DEBUG] productData FULL:', JSON.stringify(productData, null, 2));
-
+                
                 if (result) {
                     await loadProducts();
                     showToast('تم تحديث المنتج بنجاح', 'success');
@@ -279,6 +275,10 @@ export default function AdminPage() {
                 }
             } else {
                 result = await addProduct(productData);
+
+                console.log('🔴 [1.5] vehicleFitments before sending to addProduct:', JSON.stringify(vehicleFitments, null, 2));
+                console.log('🔴 [1.5] vehicleFitments length:', vehicleFitments.length);
+
                 if (result) {
                     await loadProducts();
                     showToast('تم إضافة المنتج بنجاح', 'success');
