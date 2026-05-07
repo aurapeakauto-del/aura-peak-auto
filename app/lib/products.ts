@@ -277,6 +277,12 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
 
     const newId = maxIdData && maxIdData.length > 0 ? maxIdData[0].id + 1 : 1
 
+    console.log('🔴 [2.5] product الوارد إلى addProduct:', JSON.stringify({
+        vehicleFitments: product.vehicleFitments,
+        vehicleFitmentsCount: product.vehicleFitments?.length || 0,
+        name: product.name
+    }, null, 2));
+
     const supabaseProduct = toSupabaseProduct({
         ...product,
         id: newId
