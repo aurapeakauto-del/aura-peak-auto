@@ -269,6 +269,15 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 // ============ دوال الإدارة (Admin) ============
 
 export async function addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
+    // ✅ مصحح [2.5] - استلام البيانات
+    console.log('🔴 [2.5] addProduct received:', {
+        name: product.name,
+        vehicleFitmentsCount: product.vehicleFitments?.length || 0,
+        vehicleFitments: product.vehicleFitments,
+        variantsCount: product.variants?.length || 0
+    });
+
+    // الحصول على أقصى ID + 1
     const { data: maxIdData } = await supabase
         .from('products')
         .select('id')
@@ -277,22 +286,15 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
 
     const newId = maxIdData && maxIdData.length > 0 ? maxIdData[0].id + 1 : 1
 
-    console.log('🔴 [2.5] product الوارد إلى addProduct:', JSON.stringify({
-        vehicleFitments: product.vehicleFitments,
-        vehicleFitmentsCount: product.vehicleFitments?.length || 0,
-        name: product.name
-    }, null, 2));
-
     const supabaseProduct = toSupabaseProduct({
         ...product,
         id: newId
     })
 
-    // ✅ مصححات قبل الإرسال
+    // ✅ مصحح [4] - قبل الإرسال إلى Supabase
     console.log('🔴 [4] supabaseProduct قبل الإرسال:', JSON.stringify({
         id: supabaseProduct.id,
         name: supabaseProduct.name,
-        variants_count: supabaseProduct.variants?.length || 0,
         vehicle_fitments_count: supabaseProduct.vehicle_fitments?.length || 0,
         vehicle_fitments: supabaseProduct.vehicle_fitments
     }, null, 2));
@@ -303,14 +305,15 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
         .select()
         .single()
 
-    // ✅ مصححات بعد الإرسال
+    // ✅ مصحح [5] - بعد الإرسال (في حالة الخطأ)
     if (error) {
-        console.error('🔴 [5] خطأ Supabase:', error);
-        console.error('🔴 [5] تفاصيل:', error.message, error.details, error.hint);
+        console.error('🔴 [5] خطأ في إضافة المنتج:', error);
+        console.error('🔴 [5] تفاصيل الخطأ:', error.message, error.details, error.hint);
         return null
     }
 
-    console.log('🔴 [6] تم الحفظ بنجاح، vehicle_fitments في النتيجة:', data?.vehicle_fitments);
+    // ✅ مصحح [6] - بعد النجاح
+    console.log('🔴 [6] تم إضافة المنتج بنجاح، vehicle_fitments:', data?.vehicle_fitments);
     console.log('🔴 [6] البيانات الكاملة:', data);
 
     const newProduct = mapSupabaseProduct(data)
