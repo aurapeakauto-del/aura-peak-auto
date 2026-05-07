@@ -148,6 +148,9 @@ const mapSupabaseProduct = (data: any): Product => {
 
 // ✅ تحويل Product إلى شكل Supabase
 const toSupabaseProduct = (product: Partial<Product>) => {
+    // ✅ اقرأ من snake_case إذا كان موجوداً، وإلا من camelCase
+    const vehicleFitmentsData = (product as any).vehicle_fitments || product.vehicleFitments || [];
+
     const result = {
         id: product.id,
         name: product.name,
@@ -166,12 +169,11 @@ const toSupabaseProduct = (product: Partial<Product>) => {
         recommended: product.recommended || false,
         stock: product.stock || 0,
         variants: product.variants || [],
-        vehicle_fitments: product.vehicleFitments || [],
+        vehicle_fitments: vehicleFitmentsData,
         related_products: product.relatedProducts || []
     };
 
     console.log('🔴 [3] vehicle_fitments في supabaseData:', JSON.stringify(result.vehicle_fitments, null, 2));
-    console.log('🔴 [3] هل vehicle_fitments مصفوفة؟', Array.isArray(result.vehicle_fitments));
     console.log('🔴 [3] عدد التوافقات:', result.vehicle_fitments.length);
 
     return result;
@@ -272,8 +274,8 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
     // ✅ مصحح [2.5] - استلام البيانات
     console.log('🔴 [2.5] addProduct received:', {
         name: product.name,
-        vehicleFitmentsCount: product.vehicleFitments?.length || 0,
-        vehicleFitments: product.vehicleFitments,
+        vehicleFitmentsCount: (product as any).vehicle_fitments?.length || 0,
+        vehicleFitments: (product as any).vehicle_fitments,
         variantsCount: product.variants?.length || 0
     });
 
