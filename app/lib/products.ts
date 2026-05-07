@@ -98,10 +98,6 @@ const mapSupabaseProduct = (data: any): Product => {
     // تحويل المتغيرات من JSONB إلى مصفوفة Variant
     let variants: Variant[] = [];
     if (data.variants && Array.isArray(data.variants)) {
-
-      //  console.log('🔍 mapSupabaseProduct - data من Supabase:', data);
-      //  console.log('🔍 data.vehicle_fitments:', data.vehicle_fitments);
-
         variants = data.variants.map((v: any) => ({
             id: v.id || Date.now().toString(),
             name: v.name,
@@ -151,31 +147,35 @@ const mapSupabaseProduct = (data: any): Product => {
 }
 
 // ✅ تحويل Product إلى شكل Supabase
-const toSupabaseProduct = (product: Partial<Product>) => ({
+const toSupabaseProduct = (product: Partial<Product>) => {
+    const result = {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        cost_price: product.cost_price,
+        image: product.image,
+        images: product.images || [],
+        categories: product.categories || [],
+        discount: product.discount || 0,
+        discount_end_date: product.discount_end_date || null,
+        free_shipping: product.freeShipping || false,
+        free_shipping_end_date: product.free_shipping_end_date || null,
+        offer: product.offer || false,
+        featured: product.featured || false,
+        recommended: product.recommended || false,
+        stock: product.stock || 0,
+        variants: product.variants || [],
+        vehicle_fitments: product.vehicleFitments || [],
+        related_products: product.relatedProducts || []
+    };
 
-   // console.log('🔍 toSupabaseProduct - vehicleFitments المستلمة:', product.vehicleFitments);
+    console.log('🔴 [3] vehicle_fitments في supabaseData:', JSON.stringify(result.vehicle_fitments, null, 2));
+    console.log('🔴 [3] هل vehicle_fitments مصفوفة؟', Array.isArray(result.vehicle_fitments));
+    console.log('🔴 [3] عدد التوافقات:', result.vehicle_fitments.length);
 
-    id: product.id,
-    name: product.name,
-    description: product.description,
-    price: product.price,
-    cost_price: product.cost_price,
-    image: product.image,
-    images: product.images || [],
-    categories: product.categories || [],
-    discount: product.discount || 0,
-    discount_end_date: product.discount_end_date || null,
-    free_shipping: product.freeShipping || false,
-    free_shipping_end_date: product.free_shipping_end_date || null,
-    offer: product.offer || false,
-    featured: product.featured || false,
-    recommended: product.recommended || false,
-    stock: product.stock || 0,
-    variants: product.variants || [],
-    vehicle_fitments: product.vehicleFitments || [],
-    related_products: product.relatedProducts || []
-})
-
+    return result;
+};
 // ============ دوال القراءة من Supabase ============
 
 export async function getAllProducts(): Promise<Product[]> {
@@ -282,22 +282,35 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
         id: newId
     })
 
+    // ✅ مصححات قبل الإرسال
+    console.log('🔴 [4] supabaseProduct قبل الإرسال:', JSON.stringify({
+        id: supabaseProduct.id,
+        name: supabaseProduct.name,
+        variants_count: supabaseProduct.variants?.length || 0,
+        vehicle_fitments_count: supabaseProduct.vehicle_fitments?.length || 0,
+        vehicle_fitments: supabaseProduct.vehicle_fitments
+    }, null, 2));
+
     const { data, error } = await supabase
         .from('products')
         .insert([supabaseProduct])
         .select()
         .single()
 
+    // ✅ مصححات بعد الإرسال
     if (error) {
-        console.error('خطأ في إضافة المنتج:', error)
+        console.error('🔴 [5] خطأ Supabase:', error);
+        console.error('🔴 [5] تفاصيل:', error.message, error.details, error.hint);
         return null
     }
+
+    console.log('🔴 [6] تم الحفظ بنجاح، vehicle_fitments في النتيجة:', data?.vehicle_fitments);
+    console.log('🔴 [6] البيانات الكاملة:', data);
 
     const newProduct = mapSupabaseProduct(data)
     await notifyN8N(newProduct);
     return newProduct
 }
-
 export async function updateProduct(id: number, updates: Partial<Product>): Promise<Product | null> {
     const supabaseUpdates = toSupabaseProduct(updates)
 
