@@ -261,10 +261,7 @@ export default function AdminPage() {
             vehicle_fitments: vehicleFitments,
             relatedProducts: relatedProducts,
         };
-
-        console.log('🔴 [1.5] vehicleFitments before sending to addProduct:', JSON.stringify(vehicleFitments, null, 2));
-        console.log('🔴 [1.5] vehicleFitments length:', vehicleFitments.length);
-
+        
         try {
             let result;
             if (editingProduct) {

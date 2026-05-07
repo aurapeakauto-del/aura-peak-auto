@@ -173,9 +173,6 @@ const toSupabaseProduct = (product: Partial<Product>) => {
         related_products: product.relatedProducts || []
     };
 
-    console.log('🔴 [3] vehicle_fitments في supabaseData:', JSON.stringify(result.vehicle_fitments, null, 2));
-    console.log('🔴 [3] عدد التوافقات:', result.vehicle_fitments.length);
-
     return result;
 };
 // ============ دوال القراءة من Supabase ============
@@ -271,13 +268,7 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 // ============ دوال الإدارة (Admin) ============
 
 export async function addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
-    // ✅ مصحح [2.5] - استلام البيانات
-    console.log('🔴 [2.5] addProduct received:', {
-        name: product.name,
-        vehicleFitmentsCount: (product as any).vehicle_fitments?.length || 0,
-        vehicleFitments: (product as any).vehicle_fitments,
-        variantsCount: product.variants?.length || 0
-    });
+   
 
     // الحصول على أقصى ID + 1
     const { data: maxIdData } = await supabase
@@ -293,30 +284,12 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
         id: newId
     })
 
-    // ✅ مصحح [4] - قبل الإرسال إلى Supabase
-    console.log('🔴 [4] supabaseProduct قبل الإرسال:', JSON.stringify({
-        id: supabaseProduct.id,
-        name: supabaseProduct.name,
-        vehicle_fitments_count: supabaseProduct.vehicle_fitments?.length || 0,
-        vehicle_fitments: supabaseProduct.vehicle_fitments
-    }, null, 2));
 
     const { data, error } = await supabase
         .from('products')
         .insert([supabaseProduct])
         .select()
         .single()
-
-    // ✅ مصحح [5] - بعد الإرسال (في حالة الخطأ)
-    if (error) {
-        console.error('🔴 [5] خطأ في إضافة المنتج:', error);
-        console.error('🔴 [5] تفاصيل الخطأ:', error.message, error.details, error.hint);
-        return null
-    }
-
-    // ✅ مصحح [6] - بعد النجاح
-    console.log('🔴 [6] تم إضافة المنتج بنجاح، vehicle_fitments:', data?.vehicle_fitments);
-    console.log('🔴 [6] البيانات الكاملة:', data);
 
     const newProduct = mapSupabaseProduct(data)
     await notifyN8N(newProduct);
