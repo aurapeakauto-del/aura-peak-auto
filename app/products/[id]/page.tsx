@@ -1,28 +1,55 @@
-﻿import { getProductById } from '@/app/lib/products'
-import ProductDetailsClient from './ProductDetailsClient'
-import Link from 'next/link'
-import { notFound } from 'next/navigation'
+﻿import { getProductById } from '@/app/lib/products';
+import ProductDetailsClient from './ProductDetailsClient';
+import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 
-type tParams = Promise<{ id: string }>
+type PageProps = {
+    params: Promise<{ id: string }>;
+};
 
-export default async function ProductDetailsPage(props: { params: tParams }) {
-  // ✅ الطريقة الصحيحة لـ Next.js 16
-  const { id } = await props.params
-  
-  // ✅ تحويل id إلى رقم
-  const productId = parseInt(id)
-  
-  // ✅ التحقق من صحة id
-  if (isNaN(productId)) {
-    notFound()
-  }
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+    const { id } = await params;
+    const productId = parseInt(id);
 
-  // ✅ التحقق من وجود المنتج
-  const product = await getProductById(productId)
-  
-  if (!product) {
-    notFound()
-  }
+    if (isNaN(productId)) {
+        return {
+            title: 'منتج غير صالح',
+        };
+    }
 
-  return <ProductDetailsClient id={productId} />
+    const product = await getProductById(productId);
+
+    if (!product) {
+        return {
+            title: 'المنتج غير موجود',
+        };
+    }
+
+    return {
+        title: `${product.name} | إكسسوارات سيارات فاخرة - Aura Peak Auto`,
+        description: product.description.substring(0, 160),
+        keywords: `${product.name}, ${product.categories?.join(', ')}, اكسسوارات سيارات`,
+        openGraph: {
+            title: product.name,
+            description: product.description.substring(0, 160),
+            images: product.image ? [product.image] : [],
+        },
+    };
+}
+
+export default async function ProductDetailsPage({ params }: PageProps) {
+    const { id } = await params;
+    const productId = parseInt(id);
+
+    if (isNaN(productId)) {
+        notFound();
+    }
+
+    const product = await getProductById(productId);
+
+    if (!product) {
+        notFound();
+    }
+
+    return <ProductDetailsClient id={productId} />;
 }
