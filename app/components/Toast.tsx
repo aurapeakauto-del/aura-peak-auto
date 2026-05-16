@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -12,17 +12,13 @@ interface ToastProps {
 }
 
 export function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
-    const timerRef = useRef<NodeJS.Timeout>();
-
     useEffect(() => {
-        timerRef.current = setTimeout(() => {
+        const timer = setTimeout(() => {
             onClose();
         }, duration);
 
-        return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
-        };
-    }, [duration]); // ✅ إزالة onClose من الـ dependencies
+        return () => clearTimeout(timer);
+    }, [duration]);
 
     const getStyles = () => {
         switch (type) {
@@ -53,7 +49,6 @@ export function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
     );
 }
 
-// ToastContext (بدون تغيير)
 interface ToastContextType {
     showToast: (message: string, type: ToastType, duration?: number) => void;
 }
