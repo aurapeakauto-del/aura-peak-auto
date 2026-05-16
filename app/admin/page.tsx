@@ -227,11 +227,14 @@ export default function AdminPage() {
         setSaving(true);
 
         const images = [formData.image];
-        if (formData.additionalImages) {
-            const additional = formData.additionalImages.split(',').map(img => img.trim());
+        if (formData.additionalImages && formData.additionalImages.trim()) {
+            const additional = formData.additionalImages
+                .split(',')
+                .map(img => img.trim())
+                .filter(img => img !== '');
             images.push(...additional);
         }
-
+      
         const relatedProducts = formData.relatedProducts
             ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
             : undefined;
@@ -292,6 +295,9 @@ export default function AdminPage() {
 
     const handleEdit = (product: Product) => {
         setEditingProduct(product);
+        const additionalImages = product.images && product.images.length > 1
+            ? product.images.slice(1).join(', ')
+            : '';
         setFormData({
             id: product.id,
             name: product.name,
