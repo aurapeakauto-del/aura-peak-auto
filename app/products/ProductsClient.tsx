@@ -44,16 +44,29 @@ export default function ProductsClient() {
         setLoadingBest(false);
     };
 
-    // ✅ دالة toggle للتصنيف
-    const toggleCategory = (category: string) => {
-        setSelectedCategories(prev => {
-            if (prev.includes(category)) {
-                return prev.filter(c => c !== category);
-            } else {
-                return [...prev, category];
-            }
-        });
-        setCurrentPage(1); // إعادة تعيين الصفحة عند تغيير الفلتر
+    // ✅ دالة toggle من الـ Select
+    const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value === '') {
+            // تجاهل الخيار الفارغ
+            return;
+        }
+
+        if (value === 'الكل') {
+            // اختار الكل = مسح التصنيفات
+            setSelectedCategories([]);
+        } else if (!selectedCategories.includes(value)) {
+            // إضافة تصنيف
+            setSelectedCategories([...selectedCategories, value]);
+        }
+        // إذا كان التصنيف موجوداً مسبقاً، لا نفعل شيئاً (سيتم إزالته من الشريط)
+        setCurrentPage(1);
+    };
+
+    // ✅ دالة إزالة تصنيف واحد
+    const removeCategory = (category: string) => {
+        setSelectedCategories(prev => prev.filter(c => c !== category));
+        setCurrentPage(1);
     };
 
     // ✅ دالة مسح كل التصنيفات
@@ -84,6 +97,9 @@ export default function ProductsClient() {
     }, [filteredProducts, currentPage]);
 
     const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+    // ✅ التصنيفات المتاحة (غير المختارة) للـ Dropdown
+    const availableCategories = categories.filter(c => !selectedCategories.includes(c));
 
     if (loading) {
         return (
@@ -157,85 +173,76 @@ export default function ProductsClient() {
 
             {/* Search & Filter */}
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                <div className="flex flex-col gap-4">
-                    {/* شريط البحث */}
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="ابحث عن منتج..."
-                            value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setCurrentPage(1);
-                            }}
-                            className="w-full px-4 py-3 sm:py-3.5 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm sm:text-base rounded-none"
-                        />
-                        <span className="absolute left-3 top-3 sm:top-3.5 text-gray-400">🔍</span>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="w-full sm:w-2/3">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="ابحث عن منتج..."
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="w-full px-4 py-3 sm:py-3.5 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm sm:text-base rounded-none"
+                            />
+                            <span className="absolute left-3 top-3 sm:top-3.5 text-gray-400">🔍</span>
+                        </div>
                     </div>
 
-                    {/* ✅ فلترة متعددة - أزرار Checkbox بدلاً من Select */}
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm text-gray-500 font-medium">التصنيفات:</span>
-                            {selectedCategories.length > 0 && (
-                                <button
-                                    onClick={clearCategories}
-                                    className="text-xs text-red-500 hover:text-red-700 transition-colors"
-                                >
-                                    مسح الكل
-                                </button>
+                    {/* ✅ Select Dropdown مع دعم متعدد */}
+                    <div className="w-full sm:w-1/3 relative">
+                        <select
+                            value=""
+                            onChange={handleCategoryChange}
+                            className="w-full px-4 py-3 sm:py-3.5 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm sm:text-base appearance-none cursor-pointer rounded-none"
+                        >
+                            <option value="">اختر تصنيف...</option>
+                            {selectedCategories.length === 0 && (
+                                <option value="الكل">الكل</option>
                             )}
+                            {availableCategories.map((category) => (
+                                <option key={category} value={category}>
+                                    {category}
+                                </option>
+                            ))}
+                        </select>
+                        {/* سهم مخصص */}
+                        <div className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            {categories.map((category) => {
-                                const isSelected = selectedCategories.includes(category);
-                                return (
-                                    <button
-                                        key={category}
-                                        onClick={() => toggleCategory(category)}
-                                        className={`px-3 py-1.5 text-sm border transition-all cursor-pointer
-                                            ${isSelected
-                                                ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]'
-                                                : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
-                                            }`}
-                                    >
-                                        {category}
-                                        {isSelected && <span className="mr-1">✓</span>}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {categories.length === 0 && (
-                            <p className="text-gray-400 text-xs">لا توجد تصنيفات متاحة</p>
-                        )}
                     </div>
                 </div>
 
-                {/* ✅ علامات الفلترة النشطة */}
-                {(searchQuery || selectedCategories.length > 0) && (
+                {/* ✅ علامات التصنيفات المختارة */}
+                {selectedCategories.length > 0 && (
                     <div className="flex items-center gap-2 mt-4 flex-wrap">
-                        <span className="text-gray-500 text-sm">الفلترة النشطة:</span>
-                        {searchQuery && (
-                            <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm">
-                                بحث: {searchQuery}
-                                <button onClick={() => setSearchQuery('')}>✕</button>
-                            </span>
-                        )}
+                        <span className="text-gray-500 text-sm">التصنيفات المختارة:</span>
                         {selectedCategories.map(cat => (
                             <span key={cat} className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2c2c2c] text-white text-sm">
                                 {cat}
-                                <button onClick={() => toggleCategory(cat)}>✕</button>
+                                <button onClick={() => removeCategory(cat)}>✕</button>
                             </span>
                         ))}
                         <button
-                            onClick={() => {
-                                setSearchQuery('');
-                                clearCategories();
-                            }}
+                            onClick={clearCategories}
                             className="text-xs text-red-500 hover:text-red-700 transition-colors"
                         >
-                            إعادة تعيين الكل
+                            مسح الكل
                         </button>
+                    </div>
+                )}
+
+                {/* ✅ علامة البحث النشط */}
+                {searchQuery && (
+                    <div className="flex items-center gap-2 mt-4">
+                        <span className="text-gray-500 text-sm">الفلترة النشطة:</span>
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm">
+                            بحث: {searchQuery}
+                            <button onClick={() => setSearchQuery('')}>✕</button>
+                        </span>
                     </div>
                 )}
             </div>
@@ -268,7 +275,11 @@ export default function ProductsClient() {
                         {totalPages > 1 && (
                             <div className="flex justify-center items-center gap-3 mt-10">
                                 <button
-                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    onClick={() => {
+                                        setCurrentPage(p => Math.max(1, p - 1));
+                                        // ✅ التمرير للأعلى عند تغيير الصفحة
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
                                     disabled={currentPage === 1}
                                     className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
                                 >
@@ -278,7 +289,11 @@ export default function ProductsClient() {
                                     {currentPage} / {totalPages}
                                 </span>
                                 <button
-                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    onClick={() => {
+                                        setCurrentPage(p => Math.min(totalPages, p + 1));
+                                        // ✅ التمرير للأعلى عند تغيير الصفحة
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
                                     disabled={currentPage === totalPages}
                                     className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
                                 >
