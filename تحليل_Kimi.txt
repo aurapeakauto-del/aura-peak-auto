@@ -1,0 +1,260 @@
+============================================================
+تقرير تحليل مشروع Next.js بواسطة Kimi K2.6
+============================================================
+
+# تقرير تحليل مشروع Next.js - Aura Peak Auto
+
+## ملخص تنفيذي
+
+هذا المشروع هو متجر إلكتروني لإكسسوارات السيارات الفاخرة مبني بـ Next.js 16 مع Supabase كقاعدة بيانات. يحتوي المشروع على العديد من الأخطاء الحرجة ومشاكل الجودة التي تتطلب اهتماماً فورياً.
+
+---
+
+## 🔴 الأخطاء الحرجة (Critical Errors)
+
+### 1. إنشاء عميل Supabase مباشر في API Route بدون التحقق من البيئة
+**الملف:** `app/api/keep-alive/route.ts`
+
+```typescript
+// ❌ خطأ: استخدام مفاتيح عميل (anon) في الخادم بدلاً من مفاتيح الخدمة (service role)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+```
+
+**المشكلة:** يستخدم `NEXT_PUBLIC_SUPABASE_ANON_KEY` في API Route، وهذا مفتاح عميل يفتقر إلى صلاحيات الكتابة/الحذف المطلوبة للعمليات الإدارية. يجب استخدام `SUPABASE_SERVICE_ROLE_KEY` في الخادم.
+
+### 2. استخدام `window` و `navigator` بدون التحقق من البيئة
+**الملف:** `app/admin/login/page.tsx`
+
+```typescript
+// ❌ خطأ: window.location.replace يعمل فقط في المتصفح
+window.location.replace('/admin');
+```
+
+**المشكلة:** `window.location.replace` يُستخدم في مكون عميل، لكن Next.js قد يُجري render أولي على الخادم. يجب استخدام `router.replace()` من `next/navigation` بدلاً من ذلك.
+
+### 3. خطأ في معالجة الـ params في Next.js 15+
+**الملف:** `app/products/[id]/page.tsx`
+
+```typescript
+// ❌ خطأ: params يجب أن يكون Promise في Next.js 15+
+type tParams = Promise<{ id: string }>
+export default async function ProductDetailsPage(props: { params: tParams }) {
+  const { id } = await props.params  // صحيح
+```
+
+**ملاحظة:** الرمز `✅` في التعليق يوحي بأن هذا صحيح، لكن في Next.js 15+، `params` يجب أن يُعالج بشكل مختلف. التصحيح الموجود يعمل، لكن التعليقات المربكة قد تسبب مشاكل في الصيانة.
+
+### 4. استخدام `img` بدلاً من `Image` من Next.js
+**الملفات:** `app/components/ProductCard.tsx`, `app/products/[id]/ProductDetailsClient.tsx`, `app/admin/page.tsx`
+
+```typescript
+// ❌ في ProductCard.tsx وغيره
+<img src={product.image} alt={product.name} className="..." />
+```
+
+**المشكلة:** استخدام `<img>` بدلاً من `<Image>` من `next/image` يفقد:
+- التحميل التلقائي (lazy loading)
+- التحسين التلقائي للصور
+- منع تخطيط التحول (layout shift)
+
+### 5. خطأ في إدارة المخزون مع المتغيرات
+**الملف:** `app/lib/products.ts`
+
+```typescript
+// ❌ خطأ منطقي: المخزون الأساسي يُجمع مع مخزون المتغيرات
+const totalStock = parseInt(formData.stock) + variantsStock + fitmentsStock;
+```
+
+**المشكلة:** في `handleSubmit` في `app/admin/page.tsx`، المخزون الأساسي يُضاف إلى مخزون المتغيرات، مما يؤدي إلى تضخيم المخزون. المخزون الأساسي يجب أن يكون مستقلاً أو يُحسب بطريقة مختلفة.
+
+---
+
+## 🟡 مشاكل جودة الكود (Code Quality Issues)
+
+### 1. استخدام `any` بكثرة
+**الملفات:** متعددة، خاصة `app/admin/reports/page.tsx`
+
+```typescript
+// ❌ سيء
+const [stats, setStats] = useState<any>(null);
+const [orders, setOrders] = useState<any[]>([]);
+```
+
+**الملفات المتأثرة:**
+- `app/admin/reports/page.tsx`
+- `app/products/ProductsClient.tsx` (`bestSellers: any[]`)
+- `app/admin/page.tsx` (`productData: any`)
+
+### 2. دوال كبيرة جداً (God Functions)
+**الملف:** `app/admin/page.tsx`
+
+الملف يحتوي على أكثر من 500 سطر في مكون واحد. يجب تقسيمه إلى:
+- `ProductForm.tsx`
+- `ProductTable.tsx`
+- `VariantManager.tsx`
+- `VehicleFitmentManager.tsx`
+
+### 3. تكرار الكود
+**الملف:** `app/admin/page.tsx`
+
+```typescript
+// ❌ تكرار: نفس منطق حساب نهاية الخصم والتوصيل المجاني
+const calculateEndDate = (type: string, dateValue: string, daysValue: string) => { ... }
+```
+
+يُستخدم لحساب `discountEndDate` و `freeShippingEndDate` بنفس الطريقة.
+
+### 4. استخدام `alert` و `confirm` في التطبيقات الحديثة
+**الملفات:** `app/context/CartContext.tsx`, `app/admin/page.tsx`, `app/admin/categories/page.tsx`
+
+```typescript
+// ❌ سيء للتجربة المستخدم
+alert(`عذراً، الكمية المتوفرة من ${product.name} هي ${currentStock} قطع فقط`);
+```
+
+### 5. CSS مضمن (Inline) واستخدام ألوان ثابتة
+**الملف:** `app/page.tsx`
+
+```typescript
+// ❌ صعب الصيانة
+<div className="min-h-screen bg-[#faf7f2] flex items-center justify-center">
+```
+
+يجب استخدام متغيرات CSS أو Tailwind config.
+
+### 6. مشكلة في Toast Provider
+**الملف:** `app/components/Toast.tsx`
+
+```typescript
+// ❌ خطأ: Toast يُعرض خارج الـ Provider في DOM، لكنه يستخدم نفس z-index
+<div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] space-y-2">
+    {toasts.map(toast => (
+        <Toast key={toast.id} ... />
+    ))}
+</div>
+```
+
+**المشكلة:** يوجد `div` ثابت في `ToastProvider` وآخر في `Toast` نفسه، مما يسبب تداخلًا في التخطيط.
+
+---
+
+## 🟠 مشاكل الأداء والأمان
+
+### 1. عدم وجود Rate Limiting
+**الملف:** `app/api/keep-alive/route.ts`
+
+الـ API Route مفتوح تماماً ويمكن استغلاله لـ DDoS.
+
+### 2. تخزين البيانات الحساسة في localStorage
+**الملف:** `app/components/ImageUploader.tsx`
+
+```typescript
+// ❌ خطأ أمني: تخزين URLs في localStorage
+localStorage.setItem('cloudinary_images', JSON.stringify(newImages));
+```
+
+### 3. عدم وجود CSRF Protection
+**الملف:** `app/api/keep-alive/route.ts`
+
+لا يوجد تحقق من مصدر الطلب.
+
+### 4. مشكلة في React Strict Mode
+**الملف:** `next.config.ts`
+
+```typescript
+// ❌ خطأ: تعطيل Strict Mode يخفي أخطاء React
+reactStrictMode: false,
+```
+
+### 5. عدم استخدام `revalidate` في Sitemap
+**الملف:** `app/sitemap.ts`
+
+```typescript
+// ❌ يجب إضافة revalidation
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+```
+
+---
+
+## 📋 التحسينات المقترحة
+
+### تحسينات هيكلية
+
+| الأولوية | الملف/المنطقة | التحسين | التأثير |
+|---------|-------------|---------|--------|
+| عالية | `app/admin/page.tsx` | تقسيم إلى مكونات أصغر | صيانة أسهل، أداء أفضل |
+| عالية | `app/lib/products.ts` | إضافة TypeScript interfaces صارمة | أقل أخطاء وقت التشغيل |
+| متوسطة | `app/api/keep-alive/route.ts` | إضافة Rate Limiting | أمان أفضل |
+| متوسطة | جميع الملفات | استبدال `any` بأنواع صحيحة | جودة الكود |
+
+### تحسينات الأداء
+
+```typescript
+// ✅ في next.config.ts
+const nextConfig: NextConfig = {
+    reactStrictMode: true, // تفعيل
+    images: {
+        domains: ['res.cloudinary.com'],
+        // إضافة optimization
+        formats: ['image/webp', 'image/avif'],
+    },
+    // إضافة caching
+    async headers() {
+        return [
+            {
+                source: '/api/:path*',
+                headers: [
+                    { key: 'Cache-Control', value: 's-maxage=60, stale-while-revalidate' }
+                ]
+            }
+        ];
+    }
+}
+```
+
+### تحسينات الأمان
+
+```typescript
+// ✅ في app/api/keep-alive/route.ts
+import { rateLimit } from '@/app/lib/rate-limit';
+
+const limiter = rateLimit({
+    interval: 60 * 1000, // 1 minute
+    uniqueTokenPerInterval: 500
+});
+
+export async function GET(request: Request) {
+    try {
+        await limiter.check(request, 10, 'CACHE_TOKEN'); // 10 requests per minute
+        // ...
+    } catch {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
+}
+```
+
+---
+
+## 📊 ملخص الملفات المتأثرة
+
+| الملف | الأخطاء | الأولوية |
+|-------|---------|---------|
+| `app/api/keep-alive/route.ts` | مفاتيح Supabase خاطئة، لا rate limiting | 🔴 حرجة |
+| `app/admin/page.tsx` | أي كبير، دوال ضخمة، مخزون خاطئ | 🔴 حرجة |
+| `app/admin/login/page.tsx` | استخدام window بدون حماية | 🟡 متوسطة |
+| `app/context/CartContext.tsx` | alert بدلاً من Toast | 🟡 متوسطة |
+| `app/components/Toast.tsx` | تداخل في DOM | 🟡 متوسطة |
+| `app/products/[id]/page.tsx` | params معقد | 🟢 منخفضة |
+| `next.config.ts` | Strict Mode معطل | 🟡 متوسطة |
+| `app/sitemap.ts` | لا revalidation | 🟢 منخفضة |
+
+---
+
+## 💡 توصيات نهائية
+
+1. **فوراً:** تصحيح مفاتيح Supabase في `app/api/keep-alive/route.ts`
+2. **خلال أسبوع:** إعادة هيكلة `app/admin/page.tsx`
+3. **خلال شهر:** إضافة اختبارات وحدة (Unit Tests) للمنطق الحسابي
+4. **مستمر:** استخدام ESLint rules أكثر صرامة مع `@typescript-eslint/no-explicit-any`

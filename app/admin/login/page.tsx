@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/app/lib/supabase';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function AdminLogin() {
@@ -9,6 +10,7 @@ export default function AdminLogin() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,16 +26,11 @@ export default function AdminLogin() {
             if (error) throw error;
 
             if (data?.session) {
-                console.log('✅ تم تسجيل الدخول، جاري التوجيه...');
-
-                // ✅ استخدام replace بدلاً من href
-                window.location.replace('/admin');
-
-                // ✅ تأكيد أن الكود وصل إلى هنا
-                console.log('✅ تم تنفيذ window.location.replace');
+                // ✅ استخدام router.replace بدلاً من window.location
+                router.replace('/admin');
+                router.refresh();
             }
         } catch (err: any) {
-            console.error('❌ خطأ:', err);
             setError(err.message || 'حدث خطأ في تسجيل الدخول');
         } finally {
             setLoading(false);
@@ -54,6 +51,7 @@ export default function AdminLogin() {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none"
+                            placeholder="admin@example.com"
                         />
                     </div>
 
@@ -65,6 +63,7 @@ export default function AdminLogin() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none"
+                            placeholder="••••••••"
                         />
                     </div>
 

@@ -268,8 +268,6 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 // ============ دوال الإدارة (Admin) ============
 
 export async function addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
-   
-
     // الحصول على أقصى ID + 1
     const { data: maxIdData } = await supabase
         .from('products')
@@ -284,18 +282,21 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product 
         id: newId
     })
 
-
     const { data, error } = await supabase
         .from('products')
         .insert([supabaseProduct])
         .select()
         .single()
 
+    if (error) {
+        console.error('خطأ في إضافة المنتج:', error)
+        return null
+    }
+
     const newProduct = mapSupabaseProduct(data)
     await notifyN8N(newProduct);
     return newProduct
-}
-export async function updateProduct(id: number, updates: Partial<Product>): Promise<Product | null> {
+} export async function updateProduct(id: number, updates: Partial<Product>): Promise<Product | null> {
     const supabaseUpdates = toSupabaseProduct(updates)
 
     const { data, error } = await supabase
