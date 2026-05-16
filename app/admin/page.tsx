@@ -155,7 +155,7 @@ export default function AdminPage() {
         freeShippingEndDate: '',
         freeShippingDays: '',
         image: '',
-        additionalImages: '',
+        additionalImages: [] as string[],
         categories: [] as string[],
         description: '',
         costPrice: '',
@@ -466,29 +466,58 @@ export default function AdminPage() {
                                     {/* صور إضافية */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">صور إضافية</label>
-                                        <input type="text" name="additionalImages" value={formData.additionalImages} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none text-sm mb-2" placeholder="روابط مفصولة بفواصل" />
+
+                                        {/* ✅ روابط يدوية - يمكن إزالة هذا الحقل أو تحويله إلى إدخال منفصل */}
+                                        <input
+                                            type="text"
+                                            name="additionalImagesText"
+                                            value={formData.additionalImages.join(', ')}
+                                            onChange={(e) => {
+                                                // تحويل النص المدخل إلى مصفوفة
+                                                const text = e.target.value;
+                                                const imagesArray = text.split(',').map(s => s.trim()).filter(s => s);
+                                                setFormData(prev => ({ ...prev, additionalImages: imagesArray }));
+                                            }}
+                                            className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none text-sm mb-2"
+                                            placeholder="روابط مفصولة بفواصل"
+                                        />
+
                                         <div className="mt-2">
                                             <label className="block text-gray-500 text-xs mb-1">أو ارفع صوراً إضافية</label>
                                             <ImageUploader onUpload={(url) => {
-                                                const current = formData.additionalImages ? formData.additionalImages.split(',').map(s => s.trim()) : [];
+                                                // ✅ إضافة الرابط الجديد إلى المصفوفة
+                                                const current = [...(formData.additionalImages || [])];
                                                 current.push(url);
-                                                setFormData(prev => ({ ...prev, additionalImages: current.join(', ') }));
+                                                setFormData(prev => ({ ...prev, additionalImages: current }));
                                                 showToast('تمت إضافة الصورة', 'success');
                                             }} />
                                         </div>
-                                        {formData.additionalImages && (
+
+                                        {/* ✅ عرض الصور المضافة كمصفوفة */}
+                                        {formData.additionalImages && formData.additionalImages.length > 0 && (
                                             <div className="mt-3">
-                                                <p className="text-gray-500 text-xs mb-2">الصور المضافة ({formData.additionalImages.split(',').length}):</p>
+                                                <p className="text-gray-500 text-xs mb-2">الصور المضافة ({formData.additionalImages.length}):</p>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {formData.additionalImages.split(',').map((img, idx) => (
+                                                    {formData.additionalImages.map((img, idx) => (
                                                         <div key={idx} className="relative group">
-                                                            <img src={img.trim()} alt={`صورة ${idx + 1}`} className="w-16 h-16 object-cover rounded border border-gray-700" onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.jpg'; }} />
-                                                            <button type="button" onClick={() => {
-                                                                const imgs = formData.additionalImages.split(',').map(s => s.trim());
-                                                                imgs.splice(idx, 1);
-                                                                setFormData(prev => ({ ...prev, additionalImages: imgs.join(', ') }));
-                                                                showToast('تم حذف الصورة', 'info');
-                                                            }} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                                                            <img
+                                                                src={img.trim()}
+                                                                alt={`صورة ${idx + 1}`}
+                                                                className="w-16 h-16 object-cover rounded border border-gray-700"
+                                                                onError={(e) => { (e.target as HTMLImageElement).src = '/images/placeholder.jpg'; }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newImages = [...formData.additionalImages];
+                                                                    newImages.splice(idx, 1);
+                                                                    setFormData(prev => ({ ...prev, additionalImages: newImages }));
+                                                                    showToast('تم حذف الصورة', 'info');
+                                                                }}
+                                                                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                ✕
+                                                            </button>
                                                         </div>
                                                     ))}
                                                 </div>
