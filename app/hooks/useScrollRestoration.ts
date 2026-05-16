@@ -1,114 +1,114 @@
 ﻿'use client';
 
-import { useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useCallback } from 'react';
 
 export function useScrollRestoration(key: string) {
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const scrollPositions = useRef<Map<string, number>>(new Map());
+    const keyRef = useRef(key);
+    keyRef.current = key;
     const isRestoring = useRef(false);
+    const lastSavedRef = useRef(0);
 
-    // حفظ موضع التمرير قبل مغادرة الصفحة
-    useEffect(() => {
-        const savePosition = () => {
-            const pos = window.scrollY;
-            scrollPositions.current.set(key, pos);
-            // حفظ في sessionStorage كنسخة احتياطية
+    // حفظ موضع التمرير
+    const savePosition = useCallback(() => {
+        const pos = window.scrollY || document.documentElement.scrollTop;
+        if (pos > 0) {
+            lastSavedRef.current = pos;
             try {
-                sessionStorage.setItem(`scroll_${key}`, pos.toString());
+                sessionStorage.setItem(`scroll_${keyRef.current}`, pos.toString());
             } catch (e) {
                 // ignore
             }
-        };
+        }
+    }, []);
 
-        // حفظ عند التمرير (للتحديث المستمر)
+    useEffect(() => {
+        // استعادة التمرير أول مرة فقط
+        if (!isRestoring.current) {
+            try {
+                const saved = sessionStorage.getItem(`scroll_${keyRef.current}`);
+                if (saved) {
+                    const targetScroll = parseInt(saved);
+                    if (targetScroll > 0) {
+                        isRestoring.current = true;
+
+                        const tryRestore = (attempts: number) => {
+                            if (attempts <= 0) {
+                                isRestoring.current = false;
+                                return;
+                            }
+
+                            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+                            const finalTarget = Math.min(targetScroll, Math.max(0, maxScroll));
+
+                            window.scrollTo({ top: finalTarget, behavior: 'instant' });
+
+                            requestAnimationFrame(() => {
+                                const currentScroll = window.scrollY || document.documentElement.scrollTop;
+                                if (Math.abs(currentScroll - finalTarget) > 50 && finalTarget > 0) {
+                                    setTimeout(() => tryRestore(attempts - 1), 100);
+                                } else {
+                                    sessionStorage.removeItem(`scroll_${keyRef.current}`);
+                                    setTimeout(() => {
+                                        isRestoring.current = false;
+                                    }, 200);
+                                }
+                            });
+                        };
+
+                        setTimeout(() => tryRestore(8), 100);
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        // حفظ التمرير عند التمرير
         const handleScroll = () => {
-            scrollPositions.current.set(key, window.scrollY);
+            const pos = window.scrollY || document.documentElement.scrollTop;
+            if (pos > 0) {
+                lastSavedRef.current = pos;
+            }
         };
 
-        // حفظ قبل مغادرة الصفحة
-        window.addEventListener('beforeunload', savePosition);
-        window.addEventListener('scroll', handleScroll, { passive: true });
-
-        // حفظ عند النقر على أي رابط (للانتقالات الداخلية)
+        // حفظ عند النقر على الروابط
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const link = target.closest('a');
-            if (link && link.href && !link.href.startsWith('javascript')) {
+            if (link?.href && !link.href.startsWith('javascript:') && !link.href.startsWith('#')) {
                 savePosition();
             }
         };
+
+        // حفظ عند مغادرة الصفحة
+        const handleBeforeUnload = () => {
+            savePosition();
+        };
+
+        // حفظ عند الرجوع/التقدم (popstate)
+        const handlePopState = () => {
+            // سنستعيد في الدورة التالية
+            isRestoring.current = false;
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
         document.addEventListener('click', handleClick);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('popstate', handlePopState);
 
         return () => {
-            savePosition(); // حفظ نهائي
-            window.removeEventListener('beforeunload', savePosition);
+            // حفظ نهائي عند الخروج
+            if (lastSavedRef.current > 0) {
+                try {
+                    sessionStorage.setItem(`scroll_${keyRef.current}`, lastSavedRef.current.toString());
+                } catch (e) {
+                    // ignore
+                }
+            }
             window.removeEventListener('scroll', handleScroll);
             document.removeEventListener('click', handleClick);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('popstate', handlePopState);
         };
-    }, [key, pathname]); // يعيد التشغيل عند تغيير المسار
-
-    // استعادة موضع التمرير عند تحميل الصفحة
-    useEffect(() => {
-        // نحاول الاستعادة من الذاكرة أولاً، ثم من sessionStorage
-        const savedInMemory = scrollPositions.current.get(key);
-        let savedScroll: number | null = savedInMemory ?? null;
-
-        if (savedScroll === null) {
-            try {
-                const fromStorage = sessionStorage.getItem(`scroll_${key}`);
-                if (fromStorage) {
-                    savedScroll = parseInt(fromStorage);
-                }
-            } catch (e) {
-                // ignore
-            }
-        }
-
-        if (savedScroll !== null && savedScroll > 0 && !isRestoring.current) {
-            isRestoring.current = true;
-
-            // محاولات متعددة لاستعادة التمرير (لأن DOM قد لا يكون جاهزاً)
-            const tryRestore = (attempts: number) => {
-                const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-                const targetScroll = Math.min(savedScroll!, maxScroll);
-
-                if (targetScroll > 0 && attempts > 0) {
-                    window.scrollTo({ top: targetScroll, behavior: 'instant' });
-
-                    // التحقق من أن التمرير تم بنجاح
-                    requestAnimationFrame(() => {
-                        if (Math.abs(window.scrollY - targetScroll) > 50) {
-                            // لم يتم التمرير بعد، حاول مرة أخرى
-                            setTimeout(() => tryRestore(attempts - 1), 100);
-                        } else {
-                            // نجح التمرير
-                            try {
-                                sessionStorage.removeItem(`scroll_${key}`);
-                            } catch (e) {
-                                // ignore
-                            }
-                            setTimeout(() => {
-                                isRestoring.current = false;
-                            }, 200);
-                        }
-                    });
-                } else {
-                    isRestoring.current = false;
-                }
-            };
-
-            tryRestore(5); // 5 محاولات
-        }
-
-        // تنظيف sessionStorage القديم
-        return () => {
-            try {
-                sessionStorage.removeItem(`scroll_${key}`);
-            } catch (e) {
-                // ignore
-            }
-        };
-    }, [key, pathname, searchParams]);
+    }, [savePosition]);
 }
