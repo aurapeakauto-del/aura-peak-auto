@@ -225,20 +225,17 @@ export default function AdminPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-
-        console.log('🔍 [handleSubmit] formData.additionalImages قبل التقسيم:', formData.additionalImages);
-
+        
         const images = [formData.image];
         if (formData.additionalImages && formData.additionalImages.trim()) {
-            const additional = formData.additionalImages
+            // ✅ استبدال الفاصلة العربية بالإنجليزية قبل التقسيم
+            const normalized = formData.additionalImages.replace(/،/g, ',');
+            const additional = normalized
                 .split(',')
                 .map(img => img.trim())
                 .filter(img => img !== '');
             images.push(...additional);
         }
-
-        console.log('🔍 [handleSubmit] images النهائية:', images);
-
         const relatedProducts = formData.relatedProducts
             ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
             : undefined;
@@ -299,11 +296,9 @@ export default function AdminPage() {
 
     const handleEdit = (product: Product) => {
         setEditingProduct(product);
-        console.log('🔍 [handleEdit] product.images:', product.images);
         const additionalImages = product.images && product.images.length > 1
-            ? product.images.slice(1).join(', ')
+            ? product.images.slice(1).join(', ')  // ✅ فاصلة إنجليزية + مسافة
             : '';
-        console.log('🔍 [handleEdit] additionalImages:', additionalImages);
         setFormData({
             id: product.id,
             name: product.name,
