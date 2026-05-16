@@ -192,7 +192,7 @@ export default function AdminPage() {
             freeShippingEndDate: '',
             freeShippingDays: '',
             image: '',
-            additionalImages: '',
+            additionalImages: [] as string[], 
             categories: [],
             description: '',
             costPrice: '',
@@ -226,16 +226,7 @@ export default function AdminPage() {
         e.preventDefault();
         setSaving(true);
         
-        const images = [formData.image];
-        if (formData.additionalImages && formData.additionalImages.trim()) {
-            // ✅ استبدال الفاصلة العربية بالإنجليزية قبل التقسيم
-            const normalized = formData.additionalImages.replace(/،/g, ',');
-            const additional = normalized
-                .split(',')
-                .map(img => img.trim())
-                .filter(img => img !== '');
-            images.push(...additional);
-        }
+        const images = [formData.image, ...(formData.additionalImages || [])];
         const relatedProducts = formData.relatedProducts
             ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
             : undefined;
@@ -297,8 +288,8 @@ export default function AdminPage() {
     const handleEdit = (product: Product) => {
         setEditingProduct(product);
         const additionalImages = product.images && product.images.length > 1
-            ? product.images.slice(1).join(', ')  // ✅ فاصلة إنجليزية + مسافة
-            : '';
+            ? product.images.slice(1)
+            : [];
         setFormData({
             id: product.id,
             name: product.name,
@@ -313,7 +304,7 @@ export default function AdminPage() {
             freeShippingEndDate: product.free_shipping_end_date || '',
             freeShippingDays: '',
             image: product.image,
-            additionalImages: product.images?.slice(1).join('، ') || '',
+            additionalImages: additionalImages,
             categories: product.categories || [],
             description: product.description || '',
             costPrice: product.cost_price?.toString() || '',
