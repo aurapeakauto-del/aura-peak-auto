@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Product, getAllProducts, addProduct, updateProduct, deleteProduct, Variant, VehicleFitment, getTotalStockFromVariants, getTotalStockFromVehicleFitments } from '@/app/lib/products';
 import ImageUploader from '@/app/components/ImageUploader';
 import Link from 'next/link';
@@ -14,6 +14,7 @@ export default function AdminPage() {
     const [userEmail, setUserEmail] = useState('');
 
     const [productList, setProductList] = useState<Product[]>([]);
+    const [filteredProductList, setFilteredProductList] = useState<Product[]>([]);
     const [availableCategories, setAvailableCategories] = useState<string[]>([]);
     const [productsLoading, setProductsLoading] = useState(true);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -21,8 +22,19 @@ export default function AdminPage() {
     const [saving, setSaving] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
+    // ✅ جديد: حالة البحث
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // ✅ جديد: قائمة منسدلة للمنتجات المشابهة
+    const [relatedDropdownOpen, setRelatedDropdownOpen] = useState(false);
+    const [relatedSearch, setRelatedSearch] = useState('');
+    const relatedDropdownRef = useRef<HTMLDivElement>(null);
+
     const { showToast } = useToast();
     const router = useRouter();
+
+    // ✅ جديد: مرجع للنموذج للتمرير إليه
+    const formRef = useRef<HTMLDivElement>(null);
 
     // ============ دوال المتغيرات ============
     const [variants, setVariants] = useState<Variant[]>([]);
@@ -115,6 +127,17 @@ export default function AdminPage() {
         checkUser();
     }, []);
 
+    // ✅ إغلاق القائمة المنسدلة عند النقر خارجها
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (relatedDropdownRef.current && !relatedDropdownRef.current.contains(event.target as Node)) {
+                setRelatedDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const checkUser = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
@@ -132,8 +155,24 @@ export default function AdminPage() {
         setProductsLoading(true);
         const data = await getAllProducts();
         setProductList(data);
+        setFilteredProductList(data);
         setProductsLoading(false);
     };
+
+    // ✅ تصفية المنتجات بناءً على البحث
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setFilteredProductList(productList);
+            return;
+        }
+        const query = searchQuery.toLowerCase().trim();
+        const filtered = productList.filter(product =>
+            product.name.toLowerCase().includes(query) ||
+            product.id.toString().includes(query) ||
+            product.categories.some(cat => cat.toLowerCase().includes(query))
+        );
+        setFilteredProductList(filtered);
+    }, [searchQuery, productList]);
 
     const loadCategories = async () => {
         const { getAllCategories } = await import('@/app/lib/categories');
@@ -192,7 +231,7 @@ export default function AdminPage() {
             freeShippingEndDate: '',
             freeShippingDays: '',
             image: '',
-            additionalImages: [] as string[], 
+            additionalImages: [] as string[],
             categories: [],
             description: '',
             costPrice: '',
@@ -202,6 +241,7 @@ export default function AdminPage() {
         setVehicleFitments([]);
         setEditingProduct(null);
         setShowAdvanced(false);
+        setRelatedSearch('');
     };
 
     const calculateEndDate = (type: string, dateValue: string, daysValue: string) => {
@@ -225,7 +265,7 @@ export default function AdminPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        
+
         const images = [formData.image, ...(formData.additionalImages || [])];
         const relatedProducts = formData.relatedProducts
             ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
@@ -256,7 +296,7 @@ export default function AdminPage() {
             vehicle_fitments: vehicleFitments,
             relatedProducts: relatedProducts,
         };
-        
+
         try {
             let result;
             if (editingProduct) {
@@ -313,9 +353,16 @@ export default function AdminPage() {
         setVariants(product.variants || []);
         setVehicleFitments(product.vehicleFitments || []);
         setShowForm(true);
+
+        // ✅ التمرير إلى النموذج
+        setTimeout(() => {
+            formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     };
 
+    // ✅ دالة الحذف مع Toast بدلاً من confirm
     const handleDelete = async (id: number) => {
+        // استخدام confirm مؤقتاً (لا يمكن استبداله بالكامل بـ Toast لأنه يحتاج رد المستخدم)
         if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
             const success = await deleteProduct(id);
             if (success) {
@@ -326,6 +373,32 @@ export default function AdminPage() {
             }
         }
     };
+
+    // ✅ دالة إضافة منتج للـ relatedProducts من القائمة المنسدلة
+    const addRelatedProduct = (productId: number) => {
+        const currentIds = formData.relatedProducts
+            ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+            : [];
+
+        if (!currentIds.includes(productId)) {
+            const newIds = [...currentIds, productId];
+            setFormData(prev => ({
+                ...prev,
+                relatedProducts: newIds.join('، ')
+            }));
+        }
+        setRelatedDropdownOpen(false);
+        setRelatedSearch('');
+    };
+
+    // المنتجات المتاحة للقائمة المنسدلة (غير الموجودة حالياً في relatedProducts)
+    const currentRelatedIds = formData.relatedProducts
+        ? formData.relatedProducts.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+        : [];
+
+    const availableForRelated = productList.filter(
+        p => !currentRelatedIds.includes(p.id) && p.name.toLowerCase().includes(relatedSearch.toLowerCase())
+    );
 
     const isDiscountActive = (product: Product) => {
         if (!product.discount) return false;
@@ -369,8 +442,22 @@ export default function AdminPage() {
                         </button>
                     </div>
                 </div>
+
+                {/* ✅ شريط البحث في جدول المنتجات */}
+                {!showForm && (
+                    <div className="mb-6">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="🔍 بحث عن منتج (اسم، رقم، تصنيف)..."
+                            className="w-full max-w-md px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none text-sm"
+                        />
+                    </div>
+                )}
+
                 {showForm && (
-                    <div className="bg-black border border-gray-800 p-4 sm:p-6 mb-8">
+                    <div ref={formRef} className="bg-black border border-gray-800 p-4 sm:p-6 mb-8">
                         <h2 className="text-xl font-light mb-6">{editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -467,13 +554,11 @@ export default function AdminPage() {
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">صور إضافية</label>
 
-                                        {/* ✅ روابط يدوية - يمكن إزالة هذا الحقل أو تحويله إلى إدخال منفصل */}
                                         <input
                                             type="text"
                                             name="additionalImagesText"
                                             value={formData.additionalImages.join(', ')}
                                             onChange={(e) => {
-                                                // تحويل النص المدخل إلى مصفوفة
                                                 const text = e.target.value;
                                                 const imagesArray = text.split(',').map(s => s.trim()).filter(s => s);
                                                 setFormData(prev => ({ ...prev, additionalImages: imagesArray }));
@@ -485,7 +570,6 @@ export default function AdminPage() {
                                         <div className="mt-2">
                                             <label className="block text-gray-500 text-xs mb-1">أو ارفع صوراً إضافية</label>
                                             <ImageUploader onUpload={(url) => {
-                                                // ✅ إضافة الرابط الجديد إلى المصفوفة
                                                 const current = [...(formData.additionalImages || [])];
                                                 current.push(url);
                                                 setFormData(prev => ({ ...prev, additionalImages: current }));
@@ -493,7 +577,6 @@ export default function AdminPage() {
                                             }} />
                                         </div>
 
-                                        {/* ✅ عرض الصور المضافة كمصفوفة */}
                                         {formData.additionalImages && formData.additionalImages.length > 0 && (
                                             <div className="mt-3">
                                                 <p className="text-gray-500 text-xs mb-2">الصور المضافة ({formData.additionalImages.length}):</p>
@@ -619,7 +702,7 @@ export default function AdminPage() {
                                         ))}
                                     </div>
 
-                                    {/* ===== قسم توافق المركبات الجديد (Vehicle Fitments) ===== */}
+                                    {/* ===== قسم توافق المركبات ===== */}
                                     <div className="border-t border-gray-800 pt-4">
                                         <div className="flex justify-between items-center mb-4">
                                             <label className="text-gray-400 text-sm">توافق المركبات (حسب نوع السيارة)</label>
@@ -675,11 +758,78 @@ export default function AdminPage() {
                                         </div>
                                     </div>
 
-                                    {/* منتجات مقترحة */}
+                                    {/* ✅ منتجات مقترحة مع قائمة منسدلة */}
                                     <div>
                                         <label className="block text-gray-400 text-sm mb-2">منتجات مقترحة</label>
-                                        <input type="text" name="relatedProducts" value={formData.relatedProducts} onChange={handleInputChange} className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none" placeholder="مثال: 2, 4, 6" />
-                                        <p className="text-gray-500 text-xs mt-1">أدخل أرقام المنتجات (IDs) مفصولة بفواصل، يمكنك رؤية الأرقام في عمود "#" بالجدول أدناه.</p>
+
+                                        {/* عرض المنتجات المختارة */}
+                                        {currentRelatedIds.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                {currentRelatedIds.map((id) => {
+                                                    const relatedProduct = productList.find(p => p.id === id);
+                                                    return (
+                                                        <span key={id} className="inline-flex items-center gap-1 bg-gray-800 px-2 py-1 text-sm">
+                                                            #{id} {relatedProduct?.name?.substring(0, 20)}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newIds = currentRelatedIds.filter(rid => rid !== id);
+                                                                    setFormData(prev => ({ ...prev, relatedProducts: newIds.join('، ') }));
+                                                                }}
+                                                                className="text-red-400 hover:text-red-300"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* القائمة المنسدلة */}
+                                        <div className="relative" ref={relatedDropdownRef}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setRelatedDropdownOpen(!relatedDropdownOpen)}
+                                                className="w-full px-4 py-3 bg-black border border-gray-800 text-white focus:border-white focus:outline-none text-left flex justify-between items-center"
+                                            >
+                                                <span className="text-gray-500">اختر منتجات مقترحة...</span>
+                                                <span>{relatedDropdownOpen ? '▲' : '▼'}</span>
+                                            </button>
+
+                                            {relatedDropdownOpen && (
+                                                <div className="absolute z-50 w-full mt-1 bg-black border border-gray-700 shadow-2xl max-h-60 overflow-y-auto">
+                                                    <div className="p-2">
+                                                        <input
+                                                            type="text"
+                                                            value={relatedSearch}
+                                                            onChange={(e) => setRelatedSearch(e.target.value)}
+                                                            placeholder="ابحث عن منتج..."
+                                                            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white focus:border-white focus:outline-none text-sm mb-2"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    {availableForRelated.length === 0 ? (
+                                                        <p className="text-gray-500 text-sm p-3 text-center">
+                                                            {productList.length === 0 ? 'جاري تحميل المنتجات...' : 'لا توجد منتجات متاحة'}
+                                                        </p>
+                                                    ) : (
+                                                        availableForRelated.slice(0, 20).map((product) => (
+                                                            <button
+                                                                key={product.id}
+                                                                type="button"
+                                                                onClick={() => addRelatedProduct(product.id)}
+                                                                className="w-full text-right px-4 py-2 hover:bg-gray-800 transition-colors flex items-center justify-between"
+                                                            >
+                                                                <span>{product.name}</span>
+                                                                <span className="text-gray-500 text-xs">#{product.id}</span>
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-gray-500 text-xs mt-1">اختر من القائمة أو أدخل أرقام المنتجات (IDs) مفصولة بفواصل.</p>
                                     </div>
                                 </div>
                             )}
@@ -699,6 +849,10 @@ export default function AdminPage() {
                 <div className="bg-black border border-gray-800 overflow-x-auto">
                     {productsLoading ? (
                         <div className="text-center py-20"><p className="text-gray-500">جاري تحميل المنتجات...</p></div>
+                    ) : filteredProductList.length === 0 ? (
+                        <div className="text-center py-20"><p className="text-gray-500">
+                            {searchQuery ? 'لا توجد منتجات تطابق البحث' : 'لا توجد منتجات بعد'}</p>
+                        </div>
                     ) : (
                         <table className="w-full min-w-[850px]">
                             <thead className="bg-gray-900">
@@ -713,7 +867,7 @@ export default function AdminPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800">
-                                {productList.map((product) => (
+                                {filteredProductList.map((product) => (
                                     <tr key={product.id} className="hover:bg-gray-900/50 transition-colors">
                                         <td className="px-6 py-4"><span className="text-amber-500 font-mono">#{product.id}</span></td>
                                         <td className="px-6 py-4"><p className="text-white">{product.name}</p></td>

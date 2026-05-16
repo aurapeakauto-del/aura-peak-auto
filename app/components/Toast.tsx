@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -12,13 +12,17 @@ interface ToastProps {
 }
 
 export function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
+    // ✅ الحل: استخدام ref لتجنب إعادة تشغيل المؤقت
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
     useEffect(() => {
         const timer = setTimeout(() => {
-            onClose();
+            onCloseRef.current();
         }, duration);
 
         return () => clearTimeout(timer);
-    }, [duration]);
+    }, [duration]); // ✅ لم نعد نضيف onClose للتبعيات
 
     const getStyles = () => {
         switch (type) {
@@ -39,7 +43,7 @@ export function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
     };
 
     return (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] animate-slideDown">
+        <div className="animate-slideDown">
             <div className={`${getStyles()} px-6 py-3 rounded-lg shadow-2xl flex items-center gap-3 min-w-[300px] max-w-md`}>
                 <span className="text-xl">{getIcon()}</span>
                 <p className="flex-1 text-sm font-medium">{message}</p>
