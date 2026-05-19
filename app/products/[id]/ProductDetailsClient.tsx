@@ -52,6 +52,7 @@ export default function ProductDetailsClient({ id }: Props) {
 
     useEffect(() => {
         loadProduct();
+        window.scrollTo(0, 0);
     }, [id]);
 
     const loadProduct = async () => {
