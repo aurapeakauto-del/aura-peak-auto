@@ -232,6 +232,11 @@ export default function ProductDetailsClient({ id }: Props) {
                         sessionStorage.setItem('coming_from_product', 'true');
                         router.back();
                     }}
+                    className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
+                >
+                    <span>→</span>
+                    رجوع
+                </button>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     {/* قسم الصور */}
