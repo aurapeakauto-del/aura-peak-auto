@@ -45,8 +45,29 @@ export default function ProductsClient() {
 
 
     // ✅ Intersection Observer للتحميل التلقائي
-    // استعادة التمرير عند الرجوع من منتج
-    // ✅ Intersection Observer للتحميل التلقائي - نسخة مصلحة
+
+    // حفظ التمرير باستمرار
+    useEffect(() => {
+        const handleScroll = () => {
+            localStorage.setItem('products_scroll', window.scrollY.toString());
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // استعادة التمرير عند التحميل
+    useEffect(() => {
+        const saved = localStorage.getItem('products_scroll');
+        if (saved) {
+            const y = parseInt(saved);
+            if (y > 0) {
+                setTimeout(() => {
+                    window.scrollTo({ top: y, behavior: 'instant' });
+                }, 100);
+            }
+        }
+    }, []);
+
     useEffect(() => {
         const currentLoader = loaderRef.current;
         if (!currentLoader) return;
