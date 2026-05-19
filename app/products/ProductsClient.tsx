@@ -28,6 +28,22 @@ export default function ProductsClient() {
         loadBestSellers();
     }, []);
 
+    const filteredProducts = useMemo(() => {
+        if (!products.length) return [];
+
+        return products.filter(product => {
+            const matchesSearch = searchQuery === '' ||
+                product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                product.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+            const matchesCategory = selectedCategories.length === 0 ||
+                product.categories?.some(cat => selectedCategories.includes(cat));
+
+            return matchesSearch && matchesCategory;
+        });
+    }, [products, searchQuery, selectedCategories]);
+
+
     // ✅ Intersection Observer للتحميل التلقائي
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -88,21 +104,6 @@ export default function ProductsClient() {
         setSelectedCategories([]);
         setVisibleCount(ITEMS_PER_LOAD);
     };
-
-    const filteredProducts = useMemo(() => {
-        if (!products.length) return [];
-
-        return products.filter(product => {
-            const matchesSearch = searchQuery === '' ||
-                product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-            const matchesCategory = selectedCategories.length === 0 ||
-                product.categories?.some(cat => selectedCategories.includes(cat));
-
-            return matchesSearch && matchesCategory;
-        });
-    }, [products, searchQuery, selectedCategories]);
 
     // ✅ المنتجات الظاهرة حالياً
     const visibleProducts = useMemo(() => {
