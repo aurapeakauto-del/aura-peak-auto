@@ -55,6 +55,12 @@ export default function ProductsClient() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    // حفظ الصفحة الحالية في sessionStorage عند تغيرها
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        sessionStorage.setItem('products_last_page', url.pathname + url.search);
+    }, [currentPage, searchQuery, selectedCategories]);
+
     // ✅ حفظ التمرير تلقائياً عند النقر على أي رابط لمنتج
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {

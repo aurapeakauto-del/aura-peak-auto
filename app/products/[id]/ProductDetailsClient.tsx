@@ -229,12 +229,9 @@ export default function ProductDetailsClient({ id }: Props) {
             <div className="container mx-auto px-4 py-12">
                 <button
                     onClick={() => {
-                        const savedScroll = sessionStorage.getItem('products_scroll');
-                        if (savedScroll) {
-                            router.push(`/products?scroll=${savedScroll}`);
-                        } else {
-                            router.push('/products');
-                        }
+                        // الرجوع لنفس الصفحة التي كان فيها المستخدم
+                        const lastPage = sessionStorage.getItem('products_last_page') || '/products';
+                        router.push(lastPage);
                     }}
                     className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
                 >
