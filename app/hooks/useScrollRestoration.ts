@@ -4,12 +4,15 @@ import { useEffect } from 'react';
 
 const SCROLL_KEY = 'products_scroll';
 
+// حفظ التمرير الحالي
 export function saveScrollPosition() {
     if (typeof window !== 'undefined') {
-        sessionStorage.setItem(SCROLL_KEY, window.scrollY.toString());
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        sessionStorage.setItem(SCROLL_KEY, scrollY.toString());
     }
 }
 
+// استعادة التمرير عند تحميل الصفحة
 export function useScrollRestoration() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -19,17 +22,22 @@ export function useScrollRestoration() {
         if (saved) {
             const y = parseInt(saved);
             if (y > 0) {
-                // انتظار تحميل الصور ثم استعادة التمرير
+                // استعادة التمرير بعد تحميل DOM
                 const restore = () => {
                     window.scrollTo({ top: y, behavior: 'instant' });
                     sessionStorage.removeItem(SCROLL_KEY);
                 };
 
-                // محاولة أولى بعد 100ms
-                setTimeout(restore, 100);
+                // المحاولة الأولى
+                restore();
 
-                // محاولة ثانية بعد تحميل كل الصور
-                window.addEventListener('load', restore, { once: true });
+                // محاولة إضافية بعد تحميل الصور
+                window.addEventListener('load', () => {
+                    setTimeout(restore, 200);
+                }, { once: true });
+
+                // محاولة أخيرة
+                setTimeout(restore, 500);
             }
         }
     }, []);

@@ -8,6 +8,8 @@ import { getProductById, getRelatedProducts, Product, VehicleFitment } from '@/a
 import Ratings from '@/app/components/Ratings';
 import { useToast } from '@/app/components/Toast';
 import VehicleFitmentSelector from './VehicleFitmentSelector';
+import { saveScrollPosition } from '@/app/hooks/useScrollRestoration';
+
 
 interface Props {
     id: number;
@@ -50,6 +52,8 @@ export default function ProductDetailsClient({ id }: Props) {
 
     useEffect(() => {
         loadProduct();
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    
     }, [id]);
 
     const loadProduct = async () => {
@@ -229,7 +233,7 @@ export default function ProductDetailsClient({ id }: Props) {
                     className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
                 >
                     <span>→</span>
-                    رجوع للمنتجات
+                    رجوع
                 </button>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
