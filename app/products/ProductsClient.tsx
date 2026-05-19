@@ -44,6 +44,20 @@ export default function ProductsClient() {
         });
     }, [products, searchQuery, selectedCategories]);
 
+    // استعادة التمرير من localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('products_scroll');
+        if (saved) {
+            const y = parseInt(saved);
+            if (y > 0) {
+                setTimeout(() => {
+                    window.scrollTo({ top: y, behavior: 'instant' });
+                    localStorage.removeItem('products_scroll');
+                }, 100);
+            }
+        }
+    }, []);
+
     // Intersection Observer
     useEffect(() => {
         const currentLoader = loaderRef.current;
@@ -364,12 +378,16 @@ export default function ProductsClient() {
 
                                     {/* أزرار الإجراءات */}
                                     <div className="flex gap-3 mt-6">
-                                        <Link
-                                            href={`/products/${modalProduct.id}`}
-                                            className="flex-1 text-center px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors rounded-lg"
-                                        >
-                                            عرض التفاصيل الكاملة ←
-                                        </Link>
+                                            <Link
+                                                href={`/products/${modalProduct.id}`}
+                                                onClick={() => {
+                                                    localStorage.setItem('products_scroll', window.scrollY.toString());
+                                                    closeModal();
+                                                }}
+                                                className="flex-1 text-center px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors rounded-lg"
+                                            >
+                                                عرض التفاصيل الكاملة ←
+                                            </Link>
                                     </div>
 
                                     {/* منتجات مقترحة */}
