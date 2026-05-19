@@ -319,34 +319,39 @@ export default function ProductsClient() {
                             ))}
                         </div>
 
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-3 mt-10">
-                                <button
-                                    onClick={() => {
-                                        setCurrentPage(p => Math.max(1, p - 1));
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
-                                    disabled={currentPage === 1}
-                                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
-                                >
-                                    السابق
-                                </button>
-                                <span className="text-gray-700">
-                                    {currentPage} / {totalPages}
-                                </span>
-                                <button
-                                    onClick={() => {
-                                        setCurrentPage(p => Math.min(totalPages, p + 1));
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
-                                    disabled={currentPage === totalPages}
-                                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
-                                >
-                                    التالي
-                                </button>
-                            </div>
-                        )}
+                            {/* Pagination */}
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="flex justify-center items-center gap-3 mt-10">
+                                    <button
+                                        onClick={() => {
+                                            setCurrentPage(p => Math.max(1, p - 1));
+                                            if (!sessionStorage.getItem('products_scroll')) {
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            }
+                                        }}
+                                        disabled={currentPage === 1}
+                                        className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
+                                    >
+                                        السابق
+                                    </button>
+                                    <span className="text-gray-700">
+                                        {currentPage} / {totalPages}
+                                    </span>
+                                    <button
+                                        onClick={() => {
+                                            setCurrentPage(p => Math.min(totalPages, p + 1));
+                                            if (!sessionStorage.getItem('products_scroll')) {
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            }
+                                        }}
+                                        disabled={currentPage === totalPages}
+                                        className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
+                                    >
+                                        التالي
+                                    </button>
+                                </div>
+                            )}
                     </>
                 )}
             </div>
