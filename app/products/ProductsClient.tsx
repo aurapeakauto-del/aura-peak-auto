@@ -274,6 +274,7 @@ export default function ProductsClient() {
                                 <Link
                                     key={product.id}
                                     href={`/products/${product.id}`}
+                                    target="_blank"
                                     className="block"
                                 >
                                     <ProductCard product={product} />
