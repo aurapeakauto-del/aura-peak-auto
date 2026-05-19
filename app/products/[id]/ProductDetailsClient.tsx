@@ -52,15 +52,7 @@ export default function ProductDetailsClient({ id }: Props) {
 
     useEffect(() => {
         loadProduct();
-        // حل أقوى: تمرير فوري + تمرير بعد تأخير
         window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-
-        // محاولة إضافية بعد تحميل DOM
-        setTimeout(() => {
-            window.scrollTo(0, 0);
-        }, 50);
     }, [id]);
 
     const loadProduct = async () => {
@@ -236,12 +228,10 @@ export default function ProductDetailsClient({ id }: Props) {
         <div className="min-h-screen bg-[#faf7f2]">
             <div className="container mx-auto px-4 py-12">
                 <button
-                    onClick={() => router.back()}
-                    className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
-                >
-                    <span>→</span>
-                    رجوع
-                </button>
+                    onClick={() => {
+                        sessionStorage.setItem('coming_from_product', 'true');
+                        router.back();
+                    }}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     {/* قسم الصور */}

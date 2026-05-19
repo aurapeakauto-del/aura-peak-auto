@@ -45,26 +45,15 @@ export default function ProductsClient() {
 
 
     // ✅ Intersection Observer للتحميل التلقائي
+    // استعادة التمرير عند الرجوع من منتج
     useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && !loadingMore && visibleCount < filteredProducts.length) {
-                    setLoadingMore(true);
-                    setTimeout(() => {
-                        setVisibleCount(prev => prev + ITEMS_PER_LOAD);
-                        setLoadingMore(false);
-                    }, 300);
-                }
-            },
-            { threshold: 0.1 }
-        );
-
-        if (loaderRef.current) {
-            observer.observe(loaderRef.current);
+        const comingFromProduct = sessionStorage.getItem('coming_from_product');
+        if (comingFromProduct === 'true') {
+            sessionStorage.removeItem('coming_from_product');
+            return;
         }
-
-        return () => observer.disconnect();
-    }, [loadingMore, visibleCount, filteredProducts.length]);
+        window.scrollTo(0, 0);
+    }, []);
 
     const loadProducts = async () => {
         setLoading(true);
