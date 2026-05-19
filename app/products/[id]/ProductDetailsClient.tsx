@@ -225,11 +225,11 @@ export default function ProductDetailsClient({ id }: Props) {
         <div className="min-h-screen bg-[#faf7f2]">
             <div className="container mx-auto px-4 py-12">
                 <button
-                    onClick={() => router.back()}
+                    onClick={() => router.push('/products')}
                     className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
                 >
                     <span>→</span>
-                    رجوع
+                    رجوع للمنتجات
                 </button>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
