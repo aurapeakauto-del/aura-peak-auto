@@ -1,12 +1,13 @@
 ﻿'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getAllProducts } from '@/app/lib/products';
 import { getBestSellers } from '@/app/lib/orders';
 import { Product } from '@/app/lib/products';
 import ProductCard from '@/app/components/ProductCard';
 import Link from 'next/link';
-import { useScrollRestoration, saveScrollPosition } from '@/app/hooks/useScrollRestoration';
+
+const ITEMS_PER_LOAD = 12;
 
 export default function ProductsClient() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -16,68 +17,38 @@ export default function ProductsClient() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 12;
 
-    const [initialScrollDone, setInitialScrollDone] = useState(false);
-
-    useEffect(() => {
-        if (initialScrollDone) return;
-
-        // قراءة scroll من URL
-        const params = new URLSearchParams(window.location.search);
-        const scrollParam = params.get('scroll');
-
-        if (scrollParam) {
-            const y = parseInt(scrollParam);
-            if (y > 0) {
-                setTimeout(() => {
-                    window.scrollTo({ top: y, behavior: 'instant' });
-                    setInitialScrollDone(true);
-
-                    // تنظيف URL
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('scroll');
-                    window.history.replaceState({}, '', url.toString());
-                }, 300);
-                return;
-            }
-        }
-
-        // حفظ التمرير في sessionStorage باستمرار
-        const handleScroll = () => {
-            sessionStorage.setItem('products_scroll', window.scrollY.toString());
-        };
-
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        setInitialScrollDone(true);
-
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    // حفظ الصفحة الحالية في sessionStorage عند تغيرها
-    useEffect(() => {
-        const url = new URL(window.location.href);
-        sessionStorage.setItem('products_last_page', url.pathname + url.search);
-    }, [currentPage, searchQuery, selectedCategories]);
-
-    // ✅ حفظ التمرير تلقائياً عند النقر على أي رابط لمنتج
-    useEffect(() => {
-        const handleClick = (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            const link = target.closest('a');
-            if (link?.href && link.href.includes('/products/') && !link.href.endsWith('/products')) {
-                saveScrollPosition();
-            }
-        };
-        document.addEventListener('click', handleClick);
-        return () => document.removeEventListener('click', handleClick);
-    }, []);
+    // ✅ Infinite Scroll
+    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const loaderRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         loadProducts();
         loadBestSellers();
     }, []);
+
+    // ✅ Intersection Observer للتحميل التلقائي
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && !loadingMore && visibleCount < filteredProducts.length) {
+                    setLoadingMore(true);
+                    setTimeout(() => {
+                        setVisibleCount(prev => prev + ITEMS_PER_LOAD);
+                        setLoadingMore(false);
+                    }, 300);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (loaderRef.current) {
+            observer.observe(loaderRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [loadingMore, visibleCount, filteredProducts.length]);
 
     const loadProducts = async () => {
         setLoading(true);
@@ -105,17 +76,17 @@ export default function ProductsClient() {
         } else if (!selectedCategories.includes(value)) {
             setSelectedCategories([...selectedCategories, value]);
         }
-        setCurrentPage(1);
+        setVisibleCount(ITEMS_PER_LOAD); // إعادة تعيين
     };
 
     const removeCategory = (category: string) => {
         setSelectedCategories(prev => prev.filter(c => c !== category));
-        setCurrentPage(1);
+        setVisibleCount(ITEMS_PER_LOAD);
     };
 
     const clearCategories = () => {
         setSelectedCategories([]);
-        setCurrentPage(1);
+        setVisibleCount(ITEMS_PER_LOAD);
     };
 
     const filteredProducts = useMemo(() => {
@@ -133,13 +104,12 @@ export default function ProductsClient() {
         });
     }, [products, searchQuery, selectedCategories]);
 
-    const paginatedProducts = useMemo(() => {
-        const start = (currentPage - 1) * itemsPerPage;
-        return filteredProducts.slice(start, start + itemsPerPage);
-    }, [filteredProducts, currentPage]);
+    // ✅ المنتجات الظاهرة حالياً
+    const visibleProducts = useMemo(() => {
+        return filteredProducts.slice(0, visibleCount);
+    }, [filteredProducts, visibleCount]);
 
-    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-
+    const hasMore = visibleCount < filteredProducts.length;
     const availableCategories = categories.filter(c => !selectedCategories.includes(c));
 
     if (loading) {
@@ -183,17 +153,11 @@ export default function ProductsClient() {
                                     <Link
                                         key={product.id}
                                         href={`/products/${product.id}`}
-                                        onClick={saveScrollPosition}
                                         className="flex items-center gap-3 bg-white border border-gray-200 hover:border-amber-500 p-3 rounded-xl transition-all w-[280px] shadow-sm hover:shadow"
                                     >
                                         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                                             {product.image ? (
-                                                <img
-                                                    src={product.image}
-                                                    alt={product.name}
-                                                    className="w-full h-full object-cover"
-                                                    loading="lazy"
-                                                />
+                                                <img src={product.image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
                                             ) : (
                                                 <span className="text-2xl">📷</span>
                                             )}
@@ -224,7 +188,7 @@ export default function ProductsClient() {
                                 value={searchQuery}
                                 onChange={(e) => {
                                     setSearchQuery(e.target.value);
-                                    setCurrentPage(1);
+                                    setVisibleCount(ITEMS_PER_LOAD);
                                 }}
                                 className="w-full px-4 py-3 sm:py-3.5 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm sm:text-base rounded-none"
                             />
@@ -232,7 +196,6 @@ export default function ProductsClient() {
                         </div>
                     </div>
 
-                    {/* Select Dropdown مع دعم متعدد */}
                     <div className="w-full sm:w-1/3 relative">
                         <select
                             value=""
@@ -267,37 +230,33 @@ export default function ProductsClient() {
                                 <button onClick={() => removeCategory(cat)}>✕</button>
                             </span>
                         ))}
-                        <button
-                            onClick={clearCategories}
-                            className="text-xs text-red-500 hover:text-red-700 transition-colors"
-                        >
+                        <button onClick={clearCategories} className="text-xs text-red-500 hover:text-red-700 transition-colors">
                             مسح الكل
                         </button>
                     </div>
                 )}
 
-                {/* علامة البحث النشط */}
                 {searchQuery && (
                     <div className="flex items-center gap-2 mt-4">
                         <span className="text-gray-500 text-sm">الفلترة النشطة:</span>
                         <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm">
                             بحث: {searchQuery}
-                            <button onClick={() => setSearchQuery('')}>✕</button>
+                            <button onClick={() => { setSearchQuery(''); setVisibleCount(ITEMS_PER_LOAD); }}>✕</button>
                         </span>
                     </div>
                 )}
             </div>
 
-            {/* Products Grid */}
+            {/* Products Grid - Infinite Scroll */}
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-                {paginatedProducts.length === 0 ? (
+                {visibleProducts.length === 0 ? (
                     <div className="text-center py-12 sm:py-16">
                         <p className="text-gray-500 text-base sm:text-lg">لا توجد منتجات مطابقة للبحث</p>
                         <button
                             onClick={() => {
                                 setSearchQuery('');
                                 clearCategories();
-                                setCurrentPage(1);
+                                setVisibleCount(ITEMS_PER_LOAD);
                             }}
                             className="mt-4 px-5 sm:px-6 py-2.5 sm:py-3 bg-[#2c2c2c] text-white hover:bg-gray-700 transition-colors text-sm sm:text-base rounded-none"
                         >
@@ -307,11 +266,10 @@ export default function ProductsClient() {
                 ) : (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
-                            {paginatedProducts.map((product) => (
+                            {visibleProducts.map((product) => (
                                 <Link
                                     key={product.id}
                                     href={`/products/${product.id}`}
-                                    onClick={saveScrollPosition}
                                     className="block"
                                 >
                                     <ProductCard product={product} />
@@ -319,39 +277,18 @@ export default function ProductsClient() {
                             ))}
                         </div>
 
-                            {/* Pagination */}
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="flex justify-center items-center gap-3 mt-10">
-                                    <button
-                                        onClick={() => {
-                                            setCurrentPage(p => Math.max(1, p - 1));
-                                            if (!sessionStorage.getItem('products_scroll')) {
-                                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                                            }
-                                        }}
-                                        disabled={currentPage === 1}
-                                        className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
-                                    >
-                                        السابق
-                                    </button>
-                                    <span className="text-gray-700">
-                                        {currentPage} / {totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => {
-                                            setCurrentPage(p => Math.min(totalPages, p + 1));
-                                            if (!sessionStorage.getItem('products_scroll')) {
-                                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                                            }
-                                        }}
-                                        disabled={currentPage === totalPages}
-                                        className="px-5 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
-                                    >
-                                        التالي
-                                    </button>
+                        {/* ✅ مؤشر التحميل للـ Infinite Scroll */}
+                        <div ref={loaderRef} className="py-10 text-center">
+                            {loadingMore && (
+                                <div className="flex items-center justify-center gap-2 text-gray-500">
+                                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                    <span>جاري تحميل المزيد...</span>
                                 </div>
                             )}
+                            {!hasMore && filteredProducts.length > ITEMS_PER_LOAD && (
+                                <p className="text-gray-400 text-sm">تم عرض جميع المنتجات ✓</p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>
