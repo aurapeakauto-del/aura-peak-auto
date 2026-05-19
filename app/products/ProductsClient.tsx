@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { getAllProducts, getProductById, getRelatedProducts, Product } from '@/app/lib/products';
 import { getBestSellers } from '@/app/lib/orders';
 import ProductCard from '@/app/components/ProductCard';
+import ProductDetailsClient from './[id]/ProductDetailsClient';
 import { useCart } from '@/app/context/CartContext';
 import { useToast } from '@/app/components/Toast';
 import Ratings from '@/app/components/Ratings';
@@ -261,13 +262,18 @@ export default function ProductsClient() {
             )}
 
             {/* ✅ Modal كبير - صفحة كاملة بالميزات */}
+            {/* ✅ Modal كبير - يستخدم ProductDetailsClient الأصلي */}
             {fullModalOpen && modalProduct && (
-                <FullProductModal
-                    product={modalProduct}
-                    relatedProducts={modalRelated}
-                    onClose={() => setFullModalOpen(false)}
-                    onOpenOther={openProductModal}
-                />
+                <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto">
+                    <div className="fixed inset-0 bg-black/80" onClick={() => setFullModalOpen(false)} />
+                    <div className="relative bg-[#faf7f2] w-full min-h-screen z-10">
+                        <div className="sticky top-0 z-20 bg-[#faf7f2] border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <h2 className="text-lg font-medium text-[#2c2c2c] truncate">{modalProduct.name}</h2>
+                            <button onClick={() => setFullModalOpen(false)} className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition-colors">✕</button>
+                        </div>
+                        <ProductDetailsClient id={modalProduct.id} />
+                    </div>
+                </div>
             )}
         </div>
     );
