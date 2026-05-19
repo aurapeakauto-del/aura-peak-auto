@@ -229,8 +229,7 @@ export default function ProductDetailsClient({ id }: Props) {
             <div className="container mx-auto px-4 py-12">
                 <button
                     onClick={() => {
-                        sessionStorage.setItem('coming_from_product', 'true');
-                        router.back();
+                        router.push('/products');
                     }}
                     className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
                 >
