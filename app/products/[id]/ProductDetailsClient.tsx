@@ -229,9 +229,9 @@ export default function ProductDetailsClient({ id }: Props) {
             <div className="container mx-auto px-4 py-12">
                 <button
                     onClick={() => {
-                        // الرجوع مع الحفاظ على التمرير
-                        if (document.referrer && document.referrer.includes('/products')) {
-                            router.back();
+                        const savedScroll = sessionStorage.getItem('products_scroll');
+                        if (savedScroll) {
+                            router.push(`/products?scroll=${savedScroll}`);
                         } else {
                             router.push('/products');
                         }

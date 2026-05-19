@@ -19,8 +19,41 @@ export default function ProductsClient() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 12;
 
-    // ✅ حفظ واستعادة موضع التمرير
-    useScrollRestoration();
+    const [initialScrollDone, setInitialScrollDone] = useState(false);
+
+    useEffect(() => {
+        if (initialScrollDone) return;
+
+        // قراءة scroll من URL
+        const params = new URLSearchParams(window.location.search);
+        const scrollParam = params.get('scroll');
+
+        if (scrollParam) {
+            const y = parseInt(scrollParam);
+            if (y > 0) {
+                setTimeout(() => {
+                    window.scrollTo({ top: y, behavior: 'instant' });
+                    setInitialScrollDone(true);
+
+                    // تنظيف URL
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('scroll');
+                    window.history.replaceState({}, '', url.toString());
+                }, 300);
+                return;
+            }
+        }
+
+        // حفظ التمرير في sessionStorage باستمرار
+        const handleScroll = () => {
+            sessionStorage.setItem('products_scroll', window.scrollY.toString());
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        setInitialScrollDone(true);
+
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     // ✅ حفظ التمرير تلقائياً عند النقر على أي رابط لمنتج
     useEffect(() => {
