@@ -52,7 +52,15 @@ export default function ProductDetailsClient({ id }: Props) {
 
     useEffect(() => {
         loadProduct();
+        // حل أقوى: تمرير فوري + تمرير بعد تأخير
         window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+
+        // محاولة إضافية بعد تحميل DOM
+        setTimeout(() => {
+            window.scrollTo(0, 0);
+        }, 50);
     }, [id]);
 
     const loadProduct = async () => {
