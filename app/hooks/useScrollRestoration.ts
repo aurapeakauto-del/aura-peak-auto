@@ -1,70 +1,36 @@
 ﻿'use client';
 
-import { useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 
-export function useScrollRestoration(key: string) {
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const isRestoring = useRef(false);
-    const keyRef = useRef(key);
-    keyRef.current = key;
+const SCROLL_KEY = 'products_scroll';
 
+export function saveScrollPosition() {
+    if (typeof window !== 'undefined') {
+        sessionStorage.setItem(SCROLL_KEY, window.scrollY.toString());
+    }
+}
+
+export function useScrollRestoration() {
     useEffect(() => {
-        if (isRestoring.current) return;
+        if (typeof window === 'undefined') return;
 
-        const currentKey = keyRef.current;
-        const saved = sessionStorage.getItem(`scroll_${currentKey}`);
+        const saved = sessionStorage.getItem(SCROLL_KEY);
 
         if (saved) {
-            const targetScroll = parseInt(saved);
-            if (targetScroll > 0) {
-                isRestoring.current = true;
-
-                const tryRestore = (attempts: number) => {
-                    if (attempts <= 0) {
-                        isRestoring.current = false;
-                        sessionStorage.removeItem(`scroll_${currentKey}`);
-                        return;
-                    }
-
-                    window.scrollTo({ top: targetScroll, behavior: 'instant' });
-
-                    requestAnimationFrame(() => {
-                        if (Math.abs(window.scrollY - targetScroll) > 50 && targetScroll > 0) {
-                            setTimeout(() => tryRestore(attempts - 1), 100);
-                        } else {
-                            sessionStorage.removeItem(`scroll_${currentKey}`);
-                            setTimeout(() => { isRestoring.current = false; }, 300);
-                        }
-                    });
+            const y = parseInt(saved);
+            if (y > 0) {
+                // انتظار تحميل الصور ثم استعادة التمرير
+                const restore = () => {
+                    window.scrollTo({ top: y, behavior: 'instant' });
+                    sessionStorage.removeItem(SCROLL_KEY);
                 };
 
-                setTimeout(() => tryRestore(5), 50);
+                // محاولة أولى بعد 100ms
+                setTimeout(restore, 100);
+
+                // محاولة ثانية بعد تحميل كل الصور
+                window.addEventListener('load', restore, { once: true });
             }
         }
-
-        // حفظ عند مغادرة الصفحة
-        const handleBeforeUnload = () => {
-            sessionStorage.setItem(`scroll_${currentKey}`, window.scrollY.toString());
-        };
-
-        // حفظ عند النقر على الروابط
-        const handleClick = (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            const link = target.closest('a');
-            if (link?.href && !link.href.startsWith('javascript:') && !link.href.startsWith('#')) {
-                sessionStorage.setItem(`scroll_${currentKey}`, window.scrollY.toString());
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        document.addEventListener('click', handleClick);
-
-        return () => {
-            sessionStorage.setItem(`scroll_${currentKey}`, window.scrollY.toString());
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-            document.removeEventListener('click', handleClick);
-        };
-    }, [pathname, searchParams]);
+    }, []);
 }

@@ -6,7 +6,7 @@ import { getBestSellers } from '@/app/lib/orders';
 import { Product } from '@/app/lib/products';
 import ProductCard from '@/app/components/ProductCard';
 import Link from 'next/link';
-import { useScrollRestoration } from '@/app/hooks/useScrollRestoration';
+import { useScrollRestoration, saveScrollPosition } from '@/app/hooks/useScrollRestoration';
 
 export default function ProductsClient() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -20,7 +20,20 @@ export default function ProductsClient() {
     const itemsPerPage = 12;
 
     // ✅ حفظ واستعادة موضع التمرير
-    useScrollRestoration('products-page');
+    useScrollRestoration();
+
+    // ✅ حفظ التمرير تلقائياً عند النقر على أي رابط لمنتج
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const link = target.closest('a');
+            if (link?.href && link.href.includes('/products/') && !link.href.endsWith('/products')) {
+                saveScrollPosition();
+            }
+        };
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+    }, []);
 
     useEffect(() => {
         loadProducts();
@@ -44,32 +57,23 @@ export default function ProductsClient() {
         setLoadingBest(false);
     };
 
-    // ✅ دالة toggle من الـ Select
     const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
-        if (value === '') {
-            // تجاهل الخيار الفارغ
-            return;
-        }
+        if (value === '') return;
 
         if (value === 'الكل') {
-            // اختار الكل = مسح التصنيفات
             setSelectedCategories([]);
         } else if (!selectedCategories.includes(value)) {
-            // إضافة تصنيف
             setSelectedCategories([...selectedCategories, value]);
         }
-        // إذا كان التصنيف موجوداً مسبقاً، لا نفعل شيئاً (سيتم إزالته من الشريط)
         setCurrentPage(1);
     };
 
-    // ✅ دالة إزالة تصنيف واحد
     const removeCategory = (category: string) => {
         setSelectedCategories(prev => prev.filter(c => c !== category));
         setCurrentPage(1);
     };
 
-    // ✅ دالة مسح كل التصنيفات
     const clearCategories = () => {
         setSelectedCategories([]);
         setCurrentPage(1);
@@ -83,7 +87,6 @@ export default function ProductsClient() {
                 product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 product.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-            // ✅ فلترة متعددة: المنتج يطابق إذا كان لديه أي من التصنيفات المختارة
             const matchesCategory = selectedCategories.length === 0 ||
                 product.categories?.some(cat => selectedCategories.includes(cat));
 
@@ -98,7 +101,6 @@ export default function ProductsClient() {
 
     const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
 
-    // ✅ التصنيفات المتاحة (غير المختارة) للـ Dropdown
     const availableCategories = categories.filter(c => !selectedCategories.includes(c));
 
     if (loading) {
@@ -114,7 +116,7 @@ export default function ProductsClient() {
 
     return (
         <div className="min-h-screen bg-[#faf7f2]">
-            {/* الهيدر - عنوان أصغر مع العدد بجانبه */}
+            {/* الهيدر */}
             <div className="border-b border-gray-200">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                     <div className="flex items-center gap-3">
@@ -142,6 +144,7 @@ export default function ProductsClient() {
                                     <Link
                                         key={product.id}
                                         href={`/products/${product.id}`}
+                                        onClick={saveScrollPosition}
                                         className="flex items-center gap-3 bg-white border border-gray-200 hover:border-amber-500 p-3 rounded-xl transition-all w-[280px] shadow-sm hover:shadow"
                                     >
                                         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -190,7 +193,7 @@ export default function ProductsClient() {
                         </div>
                     </div>
 
-                    {/* ✅ Select Dropdown مع دعم متعدد */}
+                    {/* Select Dropdown مع دعم متعدد */}
                     <div className="w-full sm:w-1/3 relative">
                         <select
                             value=""
@@ -207,7 +210,6 @@ export default function ProductsClient() {
                                 </option>
                             ))}
                         </select>
-                        {/* سهم مخصص */}
                         <div className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -216,7 +218,7 @@ export default function ProductsClient() {
                     </div>
                 </div>
 
-                {/* ✅ علامات التصنيفات المختارة */}
+                {/* علامات التصنيفات المختارة */}
                 {selectedCategories.length > 0 && (
                     <div className="flex items-center gap-2 mt-4 flex-wrap">
                         <span className="text-gray-500 text-sm">التصنيفات المختارة:</span>
@@ -235,7 +237,7 @@ export default function ProductsClient() {
                     </div>
                 )}
 
-                {/* ✅ علامة البحث النشط */}
+                {/* علامة البحث النشط */}
                 {searchQuery && (
                     <div className="flex items-center gap-2 mt-4">
                         <span className="text-gray-500 text-sm">الفلترة النشطة:</span>
@@ -267,7 +269,14 @@ export default function ProductsClient() {
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
                             {paginatedProducts.map((product) => (
-                                <ProductCard key={product.id} product={product} />
+                                <Link
+                                    key={product.id}
+                                    href={`/products/${product.id}`}
+                                    onClick={saveScrollPosition}
+                                    className="block"
+                                >
+                                    <ProductCard product={product} />
+                                </Link>
                             ))}
                         </div>
 
@@ -277,7 +286,6 @@ export default function ProductsClient() {
                                 <button
                                     onClick={() => {
                                         setCurrentPage(p => Math.max(1, p - 1));
-                                        // ✅ التمرير للأعلى عند تغيير الصفحة
                                         window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }}
                                     disabled={currentPage === 1}
@@ -291,7 +299,6 @@ export default function ProductsClient() {
                                 <button
                                     onClick={() => {
                                         setCurrentPage(p => Math.min(totalPages, p + 1));
-                                        // ✅ التمرير للأعلى عند تغيير الصفحة
                                         window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }}
                                     disabled={currentPage === totalPages}
