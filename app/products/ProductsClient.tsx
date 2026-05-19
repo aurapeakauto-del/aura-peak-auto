@@ -273,7 +273,7 @@ export default function ProductsClient() {
                                     onClick={() => openProductModal(product.id)}
                                     className="block text-right w-full"
                                 >
-                                    <ProductCard product={product} />
+                                    <ProductCard product={product} onClick={() => openProductModal(product.id)} />
                                 </button>
                             ))}
                         </div>
