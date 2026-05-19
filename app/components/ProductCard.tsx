@@ -68,7 +68,7 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
                 {isOutOfStock ? (
                     <button disabled className="w-full py-2 bg-gray-200 text-gray-500 cursor-not-allowed rounded text-sm">غير متوفر</button>
                 ) : (
-                    <button onClick={() => setShowModal(true)} className="w-full py-2 bg-[#1a1a1a] text-white hover:bg-gray-800 rounded text-sm">إضافة للسلة</button>
+                        <button onClick={(e) => { e.stopPropagation(); setShowModal(true); }} className="w-full py-2 bg-[#1a1a1a] text-white hover:bg-gray-800 rounded text-sm">إضافة للسلة</button>
                 )}
             </div>
 
@@ -94,7 +94,7 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
                 {isOutOfStock ? (
                     <button disabled className="w-full py-3 bg-gray-200 text-gray-500 border border-gray-200 cursor-not-allowed text-sm rounded">غير متوفر</button>
                 ) : (
-                    <button onClick={() => setShowModal(true)} className="w-full py-3 bg-[#1a1a1a] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded">إضافة للسلة</button>
+                        <button onClick={(e) => { e.stopPropagation(); setShowModal(true); }} className="w-full py-3 bg-[#1a1a1a] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded">إضافة للسلة</button>
                 )}
             </div>
         </>
