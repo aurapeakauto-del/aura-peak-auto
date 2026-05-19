@@ -52,8 +52,7 @@ export default function ProductDetailsClient({ id }: Props) {
 
     useEffect(() => {
         loadProduct();
-        window.scrollTo({ top: 0, behavior: 'instant' });
-    
+        window.scrollTo(0, 0);
     }, [id]);
 
     const loadProduct = async () => {
@@ -229,7 +228,14 @@ export default function ProductDetailsClient({ id }: Props) {
         <div className="min-h-screen bg-[#faf7f2]">
             <div className="container mx-auto px-4 py-12">
                 <button
-                    onClick={() => router.back()}
+                    onClick={() => {
+                        // الرجوع مع الحفاظ على التمرير
+                        if (document.referrer && document.referrer.includes('/products')) {
+                            router.back();
+                        } else {
+                            router.push('/products');
+                        }
+                    }}
                     className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
                 >
                     <span>→</span>
