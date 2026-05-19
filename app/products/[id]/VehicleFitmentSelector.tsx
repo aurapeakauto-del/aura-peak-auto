@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { VehicleFitment } from '@/app/lib/products';
 import { useToast } from '@/app/components/Toast';
 
@@ -22,49 +22,90 @@ export default function VehicleFitmentSelector({
     onSelect
 }: VehicleFitmentSelectorProps) {
     const { showToast } = useToast();
-    const [selectedFitmentId, setSelectedFitmentId] = useState<string | null>(null);
+    const [modalOpen, setModalOpen] = useState(false);
+
+    // المراحل: 1=الماركة, 2=الموديل, 3=السنة والكمية
+    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [selectedMake, setSelectedMake] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState<string | null>(null);
+    const [selectedFitment, setSelectedFitment] = useState<VehicleFitment | null>(null);
     const [quantity, setQuantity] = useState(1);
 
-    // فلترة التوافقات المتاحة (التي لها كمية > 0)
+    // بحث
+    const [searchQuery, setSearchQuery] = useState('');
+
     const availableFitments = fitments.filter(f => f.stock > 0);
 
-    const selectedFitment = availableFitments.find(f => f.id === selectedFitmentId);
+    // استخراج الماركات الفريدة
+    const makes = useMemo(() => {
+        return [...new Set(availableFitments.map(f => f.make))].sort();
+    }, [availableFitments]);
 
-    // حساب السعر النهائي
+    // الموديلات للماركة المختارة
+    const models = useMemo(() => {
+        if (!selectedMake) return [];
+        return [...new Set(
+            availableFitments
+                .filter(f => f.make === selectedMake)
+                .map(f => f.model)
+        )].sort();
+    }, [availableFitments, selectedMake]);
+
+    // السنوات للماركة والموديل المختارين
+    const years = useMemo(() => {
+        if (!selectedMake || !selectedModel) return [];
+        return availableFitments
+            .filter(f => f.make === selectedMake && f.model === selectedModel)
+            .sort((a, b) => b.year - a.year);
+    }, [availableFitments, selectedMake, selectedModel]);
+
+    // تصفية بالبحث
+    const filteredMakes = useMemo(() => {
+        if (!searchQuery.trim()) return makes;
+        const q = searchQuery.toLowerCase();
+        return makes.filter(make =>
+            make.toLowerCase().includes(q) ||
+            availableFitments.some(f =>
+                f.make === make &&
+                f.model.toLowerCase().includes(q)
+            )
+        );
+    }, [makes, searchQuery, availableFitments]);
+
     const calculateFinalPrice = (fitment: VehicleFitment) => {
         let price = basePrice;
-        if (discount) {
-            price = price - (price * discount / 100);
-        }
+        if (discount) price = price - (price * discount / 100);
         return price + (fitment.extraPrice || 0);
     };
 
-    // عند اختيار توافق
-    const handleFitmentSelect = (fitmentId: string) => {
-        setSelectedFitmentId(fitmentId);
-        setQuantity(1);
-        
-        const fitment = availableFitments.find(f => f.id === fitmentId);
-        if (fitment) {
-            onSelect({
-                fitment,
-                quantity: 1,
-                finalPrice: calculateFinalPrice(fitment)
-            });
-        }
+    const handleMakeSelect = (make: string) => {
+        setSelectedMake(make);
+        setSelectedModel(null);
+        setSelectedFitment(null);
+        setStep(2);
+        setSearchQuery('');
     };
 
-    // تحديث الكمية
+    const handleModelSelect = (model: string) => {
+        setSelectedModel(model);
+        setSelectedFitment(null);
+        setStep(3);
+    };
+
+    const handleYearSelect = (fitment: VehicleFitment) => {
+        setSelectedFitment(fitment);
+        setQuantity(1);
+        onSelect({ fitment, quantity: 1, finalPrice: calculateFinalPrice(fitment) });
+    };
+
     const updateQuantity = (delta: number) => {
         if (!selectedFitment) return;
-        
         const newQuantity = quantity + delta;
         if (newQuantity < 1) return;
         if (newQuantity > selectedFitment.stock) {
             showToast(`الكمية المتوفرة هي ${selectedFitment.stock} قطع فقط`, 'warning');
             return;
         }
-        
         setQuantity(newQuantity);
         onSelect({
             fitment: selectedFitment,
@@ -73,7 +114,23 @@ export default function VehicleFitmentSelector({
         });
     };
 
-    // إذا كان عدد التوافقات قليلاً (أقل من 5)، نعرضها كأزرار
+    const closeModal = () => {
+        setModalOpen(false);
+        setStep(1);
+        setSearchQuery('');
+    };
+
+    const handleBack = () => {
+        if (step === 3) {
+            setStep(2);
+            setSelectedFitment(null);
+        } else if (step === 2) {
+            setStep(1);
+            setSelectedModel(null);
+        }
+    };
+
+    // ✅ اختصار: إذا كان عدد التوافقات الكلي ≤ 5، نعرض أزرار مباشرة بدون Modal
     if (availableFitments.length <= 5) {
         return (
             <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg">
@@ -81,18 +138,21 @@ export default function VehicleFitmentSelector({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     {availableFitments.map((fitment) => {
                         const finalPrice = calculateFinalPrice(fitment);
-                        const isSelected = selectedFitmentId === fitment.id;
-                        
+                        const isSelected = selectedFitment?.id === fitment.id;
+
                         return (
                             <button
                                 key={fitment.id}
                                 type="button"
-                                onClick={() => handleFitmentSelect(fitment.id)}
-                                className={`p-3 border rounded-lg text-right transition-all ${
-                                    isSelected
+                                onClick={() => {
+                                    setSelectedFitment(fitment);
+                                    setQuantity(1);
+                                    onSelect({ fitment, quantity: 1, finalPrice: calculateFinalPrice(fitment) });
+                                }}
+                                className={`p-3 border rounded-lg text-right transition-all ${isSelected
                                         ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
                                         : 'border-gray-200 hover:border-gray-400 bg-white'
-                                }`}
+                                    }`}
                             >
                                 <div className="flex justify-between items-start">
                                     <div>
@@ -119,32 +179,17 @@ export default function VehicleFitmentSelector({
                     })}
                 </div>
 
-                {/* أزرار الكمية بعد الاختيار */}
                 {selectedFitment && (
                     <div className="border-t border-gray-100 pt-4">
                         <div className="flex items-center justify-between">
                             <span className="text-gray-600 text-sm">الكمية المطلوبة:</span>
                             <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => updateQuantity(-1)}
-                                    className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
-                                >
-                                    −
-                                </button>
-                                <span className="text-[#2c2c2c] w-10 text-center font-medium">
-                                    {quantity}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => updateQuantity(1)}
-                                    className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
-                                >
-                                    +
-                                </button>
-                                <span className="text-gray-400 text-sm">
-                                    / {selectedFitment.stock} متبقي
-                                </span>
+                                <button type="button" onClick={() => updateQuantity(-1)}
+                                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded">−</button>
+                                <span className="w-10 text-center font-medium">{quantity}</span>
+                                <button type="button" onClick={() => updateQuantity(1)}
+                                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded">+</button>
+                                <span className="text-gray-400 text-sm">/ {selectedFitment.stock} متبقي</span>
                             </div>
                         </div>
                     </div>
@@ -153,70 +198,207 @@ export default function VehicleFitmentSelector({
         );
     }
 
-    // إذا كان عدد التوافقات كبيراً، نستخدم قائمة منسدلة مع بحث
+    // ✅ Modal للتعداد الكبير
     return (
-        <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg">
-            <h3 className="text-[#2c2c2c] text-sm font-medium mb-3">اختر نوع سيارتك</h3>
-            
-            <div className="relative">
-                <select
-                    value={selectedFitmentId || ''}
-                    onChange={(e) => handleFitmentSelect(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] focus:border-amber-500 focus:outline-none rounded-lg appearance-none"
-                >
-                    <option value="">-- اختر الماركة والموديل --</option>
-                    {availableFitments.map((fitment) => {
-                        const finalPrice = calculateFinalPrice(fitment);
-                        return (
-                            <option key={fitment.id} value={fitment.id}>
-                                {fitment.make} {fitment.model} ({fitment.year}) - متوفر: {fitment.stock} - JD {finalPrice.toFixed(2)}
-                                {fitment.extraPrice !== 0 && fitment.extraPrice > 0 ? ` (+${fitment.extraPrice})` : ''}
-                            </option>
-                        );
-                    })}
-                </select>
-                <div className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                    ▼
+        <div className="mb-8">
+            {/* زر فتح الـ Modal */}
+            <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-amber-400 hover:text-amber-600 transition-all text-right group"
+            >
+                <div className="flex items-center justify-between">
+                    <div>
+                        <span className="font-medium text-[#2c2c2c] group-hover:text-amber-600">
+                            {selectedFitment
+                                ? `✅ ${selectedFitment.make} ${selectedFitment.model} (${selectedFitment.year})`
+                                : '🚗 اختر نوع سيارتك'}
+                        </span>
+                        {selectedFitment && (
+                            <div className="text-sm text-amber-600 mt-1">
+                                JD {calculateFinalPrice(selectedFitment).toFixed(2)} × {quantity}
+                            </div>
+                        )}
+                    </div>
+                    <span className="text-2xl">{selectedFitment ? '🔄' : '📋'}</span>
                 </div>
-            </div>
+            </button>
 
-            {/* أزرار الكمية بعد الاختيار */}
-            {selectedFitment && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-sm text-gray-600">
-                            السعر: <span className="text-amber-600 font-semibold">
-                                JD {calculateFinalPrice(selectedFitment).toFixed(2)}
-                            </span>
-                            {selectedFitment.extraPrice !== 0 && (
-                                <span className="text-xs text-gray-400 mr-2">
-                                    ({selectedFitment.extraPrice > 0 ? `+${selectedFitment.extraPrice}` : `${selectedFitment.extraPrice}`})
-                                </span>
+            {/* ✅ الـ Modal */}
+            {modalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* الخلفية المعتمة */}
+                    <div
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        onClick={closeModal}
+                    />
+
+                    {/* محتوى الـ Modal */}
+                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+                        {/* Header */}
+                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                            <button
+                                type="button"
+                                onClick={closeModal}
+                                className="text-gray-400 hover:text-gray-600 text-xl"
+                            >
+                                ✕
+                            </button>
+                            <h3 className="text-[#2c2c2c] font-medium text-lg">
+                                {step === 1 && 'اختر الماركة'}
+                                {step === 2 && 'اختر الموديل'}
+                                {step === 3 && 'اختر السنة'}
+                            </h3>
+                            {step > 1 ? (
+                                <button
+                                    type="button"
+                                    onClick={handleBack}
+                                    className="text-amber-600 hover:text-amber-700 text-sm"
+                                >
+                                    ← رجوع
+                                </button>
+                            ) : (
+                                <div className="w-12" />
                             )}
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-gray-600 text-sm">الكمية:</span>
-                            <button
-                                type="button"
-                                onClick={() => updateQuantity(-1)}
-                                className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
-                            >
-                                −
-                            </button>
-                            <span className="text-[#2c2c2c] w-10 text-center font-medium">
-                                {quantity}
+
+                        {/* Breadcrumb */}
+                        <div className="px-4 py-2 bg-gray-50 text-sm flex items-center gap-1 text-gray-500">
+                            <span className={selectedMake ? 'text-amber-600 font-medium' : ''}>
+                                {selectedMake || '...'}
                             </span>
-                            <button
-                                type="button"
-                                onClick={() => updateQuantity(1)}
-                                className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
-                            >
-                                +
-                            </button>
-                            <span className="text-gray-400 text-sm">
-                                / {selectedFitment.stock} متبقي
+                            {selectedMake && <span>›</span>}
+                            <span className={selectedModel ? 'text-amber-600 font-medium' : ''}>
+                                {selectedModel || '...'}
+                            </span>
+                            {selectedModel && <span>›</span>}
+                            <span className={selectedFitment ? 'text-amber-600 font-medium' : ''}>
+                                {selectedFitment?.year || '...'}
                             </span>
                         </div>
+
+                        {/* محتوى حسب المرحلة */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {/* المرحلة 1: الماركات */}
+                            {step === 1 && (
+                                <>
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="🔍 ابحث عن ماركة أو موديل..."
+                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg mb-3 focus:border-amber-500 focus:outline-none text-sm"
+                                        autoFocus
+                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {filteredMakes.map(make => (
+                                            <button
+                                                key={make}
+                                                type="button"
+                                                onClick={() => handleMakeSelect(make)}
+                                                className="p-3 border border-gray-200 rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-all text-right"
+                                            >
+                                                <span className="font-medium text-[#2c2c2c]">{make}</span>
+                                                <span className="text-xs text-gray-400 block">
+                                                    {availableFitments.filter(f => f.make === make).length} موديل
+                                                </span>
+                                            </button>
+                                        ))}
+                                        {filteredMakes.length === 0 && (
+                                            <p className="col-span-2 text-center text-gray-400 py-8">
+                                                لا توجد نتائج
+                                            </p>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {/* المرحلة 2: الموديلات */}
+                            {step === 2 && selectedMake && (
+                                <div className="space-y-2">
+                                    {models.map(model => (
+                                        <button
+                                            key={model}
+                                            type="button"
+                                            onClick={() => handleModelSelect(model)}
+                                            className="w-full p-3 border border-gray-200 rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-all text-right flex justify-between items-center"
+                                        >
+                                            <span className="font-medium text-[#2c2c2c]">{model}</span>
+                                            <span className="text-xs text-gray-400">
+                                                {availableFitments.filter(f => f.make === selectedMake && f.model === model).length} سنة
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* المرحلة 3: السنوات والاختيار النهائي */}
+                            {step === 3 && selectedMake && selectedModel && (
+                                <div className="space-y-3">
+                                    {years.map(fitment => {
+                                        const finalPrice = calculateFinalPrice(fitment);
+                                        const isSelected = selectedFitment?.id === fitment.id;
+
+                                        return (
+                                            <button
+                                                key={fitment.id}
+                                                type="button"
+                                                onClick={() => handleYearSelect(fitment)}
+                                                className={`w-full p-4 border rounded-lg text-right transition-all ${isSelected
+                                                        ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
+                                                        : 'border-gray-200 hover:border-gray-400'
+                                                    }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <div className="font-medium text-[#2c2c2c]">
+                                                            {fitment.make} {fitment.model} - {fitment.year}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500">
+                                                            متوفر: {fitment.stock} قطعة
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <div className="text-amber-600 font-semibold text-lg">
+                                                            JD {finalPrice.toFixed(2)}
+                                                        </div>
+                                                        {fitment.extraPrice !== 0 && (
+                                                            <div className="text-xs text-gray-400">
+                                                                {fitment.extraPrice > 0 ? `+${fitment.extraPrice}` : `${fitment.extraPrice}`}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer: الكمية وزر التأكيد */}
+                        {selectedFitment && (
+                            <div className="p-4 border-t border-gray-200 bg-gray-50">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-gray-600 text-sm">الكمية:</span>
+                                        <button type="button" onClick={() => updateQuantity(-1)}
+                                            className="w-8 h-8 flex items-center justify-center border border-gray-300 bg-white rounded hover:bg-gray-100">−</button>
+                                        <span className="w-10 text-center font-medium">{quantity}</span>
+                                        <button type="button" onClick={() => updateQuantity(1)}
+                                            className="w-8 h-8 flex items-center justify-center border border-gray-300 bg-white rounded hover:bg-gray-100">+</button>
+                                        <span className="text-gray-400 text-sm">/ {selectedFitment.stock}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={closeModal}
+                                        className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+                                    >
+                                        تم ✓
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
