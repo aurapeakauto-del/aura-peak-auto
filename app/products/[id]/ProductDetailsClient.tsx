@@ -52,7 +52,6 @@ export default function ProductDetailsClient({ id }: Props) {
 
     useEffect(() => {
         loadProduct();
-        window.scrollTo(0, 0);
     }, [id]);
 
     const loadProduct = async () => {
@@ -228,11 +227,7 @@ export default function ProductDetailsClient({ id }: Props) {
         <div className="min-h-screen bg-[#faf7f2]">
             <div className="container mx-auto px-4 py-12">
                 <button
-                    onClick={() => {
-                        // الرجوع لنفس الصفحة التي كان فيها المستخدم
-                        const lastPage = sessionStorage.getItem('products_last_page') || '/products';
-                        router.push(lastPage);
-                    }}
+                    onClick={() => router.back()}
                     className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
                 >
                     <span>→</span>
