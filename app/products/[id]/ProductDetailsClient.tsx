@@ -10,7 +10,6 @@ import { useToast } from '@/app/components/Toast';
 import VehicleFitmentSelector from './VehicleFitmentSelector';
 import { saveScrollPosition } from '@/app/hooks/useScrollRestoration';
 
-window.close('/products')
 interface Props {
     id: number;
 }
