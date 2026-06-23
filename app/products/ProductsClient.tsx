@@ -208,29 +208,31 @@ export default function ProductsClient() {
 
                         {/* Pagination */}
                         {totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-3 mt-8">
-                               <button
-    onClick={() => {
-        setCurrentPage(p => Math.max(1, p - 1));
-        window.scrollTo(0, 0);
-    }}
-    ...
->
-    السابق
-</button>
-                                <span className="text-gray-700">
-                                    {currentPage} / {totalPages}
-                                </span>
-                              <button
-    onClick={() => {
-        setCurrentPage(p => Math.min(totalPages, p + 1));
-        window.scrollTo(0, 0);
-    }}
-    ...
->
-                        التالي
-                    </button>
-                            </div>
+                                <div className="flex justify-center items-center gap-3 mt-8">
+                                    <button
+                                        onClick={() => {
+                                            setCurrentPage(p => Math.max(1, p - 1));
+                                            window.scrollTo(0, 0);
+                                        }}
+                                        disabled={currentPage === 1}
+                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                    >
+                                        السابق
+                                    </button>
+                                    <span className="text-gray-700">
+                                        {currentPage} / {totalPages}
+                                    </span>
+                                    <button
+                                        onClick={() => {
+                                            setCurrentPage(p => Math.min(totalPages, p + 1));
+                                            window.scrollTo(0, 0);
+                                        }}
+                                        disabled={currentPage === totalPages}
+                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                    >
+                                        التالي
+                                    </button>
+                                </div>
                         )}
                     </>
                 )}
