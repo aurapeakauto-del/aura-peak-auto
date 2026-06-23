@@ -8,8 +8,6 @@ import { getProductById, getRelatedProducts, Product, VehicleFitment } from '@/a
 import Ratings from '@/app/components/Ratings';
 import { useToast } from '@/app/components/Toast';
 import VehicleFitmentSelector from './VehicleFitmentSelector';
-import { saveScrollPosition } from '@/app/hooks/useScrollRestoration';
-
 interface Props {
     id: number;
 }
@@ -227,7 +225,7 @@ export default function ProductDetailsClient({ id }: Props) {
         <div className="min-h-screen bg-[#faf7f2]">
             <div className="container mx-auto px-4 py-12">
                 <button
-                    onClick={() => { if (window.opener) window.close(); else router.push('/products'); }}
+                    onClick={() => router.back()}
                     className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors"
                 >
                     <span>→</span>

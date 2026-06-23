@@ -1,7 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import ProductCard from '@/app/components/ProductCard';
 import { getAllProducts } from '@/app/lib/products';
@@ -11,8 +10,6 @@ import type { Product } from '@/app/lib/products';
 const ITEMS_PER_PAGE = 12;
 
 export default function ProductsClient() {
-    const router = useRouter();
-
     const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [bestSellers, setBestSellers] = useState<any[]>([]);
     const [search, setSearch] = useState('');
@@ -36,32 +33,55 @@ export default function ProductsClient() {
         load();
     }, []);
 
-    // حفظ التمرير قبل الانتقال لصفحة منتج
+    // ✅ حفظ التمرير والصفحة والبحث والتصنيفات قبل الانتقال لمنتج
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const link = target.closest('a');
-            if (link?.href && link.href.includes('/products/') && !link.href.endsWith('/products')) {
+            if (link?.href?.includes('/products/') && !link.href.endsWith('/products')) {
                 sessionStorage.setItem('products_scroll', window.scrollY.toString());
+                sessionStorage.setItem('products_page', currentPage.toString());
+                sessionStorage.setItem('products_search', search);
+                sessionStorage.setItem('products_categories', JSON.stringify(selectedCategories));
             }
         };
         document.addEventListener('click', handleClick);
         return () => document.removeEventListener('click', handleClick);
-    }, []);
+    }, [currentPage, search, selectedCategories]);
 
-    // استعادة التمرير عند تحميل الصفحة
+    // ✅ استعادة التمرير والصفحة والبحث والتصنيفات بعد تحميل المنتجات
     useEffect(() => {
+        if (loading) return;
+
         const saved = sessionStorage.getItem('products_scroll');
         if (saved) {
             const y = parseInt(saved);
             if (y > 0) {
-                window.scrollTo({ top: y, behavior: 'instant' });
-                sessionStorage.removeItem('products_scroll');
+                requestAnimationFrame(() => {
+                    window.scrollTo(0, y);
+                });
             }
-        } else {
-            window.scrollTo(0, 0);
+            sessionStorage.removeItem('products_scroll');
         }
-    }, []);
+
+        const savedPage = sessionStorage.getItem('products_page');
+        if (savedPage) {
+            setCurrentPage(parseInt(savedPage));
+            sessionStorage.removeItem('products_page');
+        }
+
+        const savedSearch = sessionStorage.getItem('products_search');
+        if (savedSearch) {
+            setSearch(savedSearch);
+            sessionStorage.removeItem('products_search');
+        }
+
+        const savedCategories = sessionStorage.getItem('products_categories');
+        if (savedCategories) {
+            setSelectedCategories(JSON.parse(savedCategories));
+            sessionStorage.removeItem('products_categories');
+        }
+    }, [loading]);
 
     const filtered = useMemo(() => {
         return allProducts.filter(p => {
@@ -173,7 +193,9 @@ export default function ProductsClient() {
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                             {paginated.map(product => (
-                                <ProductCard key={product.id} product={product} />
+                                <Link key={product.id} href={`/products/${product.id}`} className="block">
+                                    <ProductCard product={product} />
+                                </Link>
                             ))}
                         </div>
 
