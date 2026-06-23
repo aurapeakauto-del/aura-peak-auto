@@ -12,7 +12,7 @@ const ITEMS_PER_PAGE = 12;
 
 export default function ProductsClient() {
     const [allProducts, setAllProducts] = useState<Product[]>([]);
-    const [bestSellers, setBestSellers] = useState<Product[]>([]);
+    const [bestSellers, setBestSellers] = useState<any[]>([]);
     const [displayed, setDisplayed] = useState<Product[]>([]);
     const [search, setSearch] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
