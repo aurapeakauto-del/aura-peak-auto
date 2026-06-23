@@ -182,7 +182,7 @@ export default function ProductsClient() {
                             <ProductCard
                                 key={product.id}
                                 product={product}
-                                onClick={() => openModal(product.id)}
+                                onImageClick={() => openModal(product.id)}
                             />
                         ))}
                     </div>

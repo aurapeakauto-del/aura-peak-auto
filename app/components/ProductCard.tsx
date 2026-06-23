@@ -13,7 +13,7 @@ interface ProductCardProps {
     onImageClick?: () => void;
 }
 
-export default function ProductCard({ product, onClick }: ProductCardProps) {
+export default function ProductCard({ product, onImageClick }: ProductCardProps) {
     const { addToCart } = useCart();
     const { showToast } = useToast();
     const [showModal, setShowModal] = useState(false);
@@ -101,16 +101,14 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
                 {product.freeShipping && (
                     <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-20 bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg whitespace-nowrap">🚚 توصيل مجاني</div>
                 )}
-                {onClick ? (
-                    <button onClick={onClick} className="block w-full text-left cursor-pointer"><ProductImage /></button>
+                {/* الصورة: إذا فيه onImageClick نستخدم button، وإلا Link */}
+                {onImageClick ? (
+                    <button onClick={onImageClick} className="block w-full text-left cursor-pointer"><ProductImage /></button>
                 ) : (
-                    <Link href={`/products/${product.id}`} onClick={(e) => e.stopPropagation()} className="block relative w-full"><ProductImage /></Link>
+                    <Link href={`/products/${product.id}`} className="block relative w-full"><ProductImage /></Link>
                 )}
-                {onClick ? (
-                    <button onClick={onClick} className="block w-full text-left cursor-pointer"><ProductContent /></button>
-                ) : (
-                    <div onClick={(e) => e.stopPropagation()}><ProductContent /></div>
-                )}
+                {/* المحتوى: دائماً بدون زر أب (عشان أزرار السلة تشتغل) */}
+                <ProductContent />
             </div>
             {showModal && (
                 <div onClick={(e) => e.stopPropagation()}>
