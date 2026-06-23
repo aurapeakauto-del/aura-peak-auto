@@ -10,7 +10,7 @@ import { Product } from '@/app/lib/products';
 
 interface ProductCardProps {
     product: Product;
-    onClick?: () => void;
+    onImageClick?: () => void;
 }
 
 export default function ProductCard({ product, onClick }: ProductCardProps) {
