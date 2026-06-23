@@ -1,262 +1,333 @@
 ﻿'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { getAllProducts, getProductById, getRelatedProducts, Product } from '@/app/lib/products';
-import { getBestSellers } from '@/app/lib/orders';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import ProductCard from '@/app/components/ProductCard';
+import { getAllProducts, getRelatedProducts } from '@/app/lib/products';
+import { getBestSellers } from '@/app/lib/orders';
+import type { Product } from '@/app/lib/products';
 
-const ITEMS_PER_LOAD = 12;
+const ITEMS_PER_PAGE = 12;
 
 export default function ProductsClient() {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [bestSellers, setBestSellers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [loadingBest, setLoadingBest] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    const [bestSellers, setBestSellers] = useState<Product[]>([]);
+    const [displayed, setDisplayed] = useState<Product[]>([]);
+    const [search, setSearch] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-    const [categories, setCategories] = useState<string[]>([]);
-
-    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
-    const [loadingMore, setLoadingMore] = useState(false);
+    const [allCategories, setAllCategories] = useState<string[]>([]);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [modalProduct, setModalProduct] = useState<Product | null>(null);
+    const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+    const [loadingModal, setLoadingModal] = useState(false);
     const loaderRef = useRef<HTMLDivElement>(null);
 
-    const [modalProduct, setModalProduct] = useState<Product | null>(null);
-    const [modalLoading, setModalLoading] = useState(false);
-    const [modalRelated, setModalRelated] = useState<Product[]>([]);
+    useEffect(() => {
+        async function load() {
+            const [products, sellers] = await Promise.all([
+                getAllProducts(),
+                getBestSellers(),
+            ]);
+            setAllProducts(products);
+            setBestSellers(sellers);
+            const cats = Array.from(new Set(products.flatMap((p) => p.categories)));
+            setAllCategories(cats);
+        }
+        load();
+    }, []);
 
-    useEffect(() => { loadProducts(); loadBestSellers(); }, []);
-
-    const filteredProducts = useMemo(() => {
-        if (!products.length) return [];
-        return products.filter(product => {
-            const matchesSearch = searchQuery === '' || product.name.toLowerCase().includes(searchQuery.toLowerCase()) || product.description.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesCategory = selectedCategories.length === 0 || product.categories?.some(cat => selectedCategories.includes(cat));
-            return matchesSearch && matchesCategory;
+    const filtered = useCallback(() => {
+        return allProducts.filter((p) => {
+            const matchSearch =
+                !search ||
+                p.name.toLowerCase().includes(search.toLowerCase()) ||
+                p.description.toLowerCase().includes(search.toLowerCase());
+            const matchCat =
+                selectedCategories.length === 0 ||
+                selectedCategories.some((c) => p.categories.includes(c));
+            return matchSearch && matchCat;
         });
-    }, [products, searchQuery, selectedCategories]);
+    }, [allProducts, search, selectedCategories]);
 
     useEffect(() => {
-        const currentLoader = loaderRef.current;
-        if (!currentLoader) return;
+        const f = filtered();
+        setDisplayed(f.slice(0, ITEMS_PER_PAGE));
+        setPage(1);
+        setHasMore(f.length > ITEMS_PER_PAGE);
+    }, [filtered]);
+
+    useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && !loadingMore && visibleCount < filteredProducts.length) {
-                    setLoadingMore(true);
-                    setTimeout(() => { setVisibleCount(prev => prev + ITEMS_PER_LOAD); setLoadingMore(false); }, 300);
+                if (entries[0].isIntersecting && hasMore) {
+                    const f = filtered();
+                    const nextPage = page + 1;
+                    const nextItems = f.slice(0, nextPage * ITEMS_PER_PAGE);
+                    setDisplayed(nextItems);
+                    setPage(nextPage);
+                    setHasMore(nextItems.length < f.length);
                 }
             },
             { threshold: 0.1 }
         );
-        observer.observe(currentLoader);
-        return () => observer.disconnect();
-    }, [loadingMore, visibleCount, filteredProducts.length]);
+        const el = loaderRef.current;
+        if (el) observer.observe(el);
+        return () => {
+            if (el) observer.unobserve(el);
+        };
+    }, [hasMore, page, filtered]);
 
-    useEffect(() => {
-        document.body.style.overflow = modalProduct ? 'hidden' : '';
-        return () => { document.body.style.overflow = ''; };
-    }, [modalProduct]);
-
-    const loadProducts = async () => {
-        setLoading(true);
-        const data = await getAllProducts();
-        setProducts(data);
-        setCategories([...new Set(data.flatMap(p => p.categories || []))].sort());
-        setLoading(false);
+    const openModal = async (productId: number) => {
+        const product = allProducts.find((p) => p.id === productId);
+        if (!product) return;
+        setModalProduct(product);
+        setLoadingModal(true);
+        const related = await getRelatedProducts(productId);
+        setRelatedProducts(related);
+        setLoadingModal(false);
     };
 
-    const loadBestSellers = async () => {
-        const data = await getBestSellers(10);
-        setBestSellers(data);
-        setLoadingBest(false);
-    };
-
-    const openProductModal = async (productId: number) => {
-        setModalLoading(true);
+    const closeModal = () => {
         setModalProduct(null);
-        const product = await getProductById(productId);
-        if (product) {
-            setModalProduct(product);
-            const related = await getRelatedProducts(productId);
-            setModalRelated(related);
-        }
-        setModalLoading(false);
+        setRelatedProducts([]);
     };
 
-    const closeModal = () => { setModalProduct(null); setModalRelated([]); };
-
-    const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const value = e.target.value;
-        if (value === '') return;
-        if (value === 'الكل') setSelectedCategories([]);
-        else if (!selectedCategories.includes(value)) setSelectedCategories([...selectedCategories, value]);
-        setVisibleCount(ITEMS_PER_LOAD);
-    };
-
-    const removeCategory = (category: string) => { setSelectedCategories(prev => prev.filter(c => c !== category)); setVisibleCount(ITEMS_PER_LOAD); };
-    const clearCategories = () => { setSelectedCategories([]); setVisibleCount(ITEMS_PER_LOAD); };
-
-    const visibleProducts = useMemo(() => filteredProducts.slice(0, visibleCount), [filteredProducts, visibleCount]);
-    const hasMore = visibleCount < filteredProducts.length;
-    const availableCategories = categories.filter(c => !selectedCategories.includes(c));
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-[#faf7f2] flex items-center justify-center">
-                <div className="text-center">
-                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#2c2c2c] border-r-transparent"></div>
-                    <p className="mt-4 text-gray-500">جاري تحميل المنتجات...</p>
-                </div>
-            </div>
+    const toggleCategory = (cat: string) => {
+        setSelectedCategories((prev) =>
+            prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
         );
-    }
+    };
+
+    const discountedPrice = (p: Product) =>
+        p.discount ? p.price - (p.price * p.discount) / 100 : p.price;
 
     return (
-        <div className="min-h-screen bg-[#faf7f2]">
-            <div className="border-b border-gray-200">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-xl sm:text-2xl lg:text-3xl font-light text-[#2c2c2c] tracking-wider">جميع المنتجات</h1>
-                        <span className="text-sm text-gray-400 bg-gray-100 px-2 py-1 rounded-full">{filteredProducts.length} منتج</span>
-                    </div>
-                </div>
-            </div>
-
-            {!loadingBest && bestSellers.length > 0 && (
-                <div className="border-b border-gray-200 bg-amber-50/50">
-                    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-5">
-                        <h2 className="text-base font-medium text-[#2c2c2c] mb-4 flex items-center gap-2"><span className="text-amber-500 text-lg">⭐</span>الأكثر مبيعاً</h2>
-                        <div className="overflow-x-auto scrollbar-hide pb-2">
-                            <div className="flex gap-4 min-w-max">
-                                {bestSellers.map((product: any) => (
-                                    <button key={product.id} onClick={() => openProductModal(product.id)} className="flex items-center gap-3 bg-white border border-gray-200 hover:border-amber-500 p-3 rounded-xl transition-all w-[280px] shadow-sm hover:shadow text-right">
-                                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                                            {product.image ? <img src={product.image} alt={product.name} className="w-full h-full object-cover" loading="lazy" /> : <span className="text-2xl">📷</span>}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-[#2c2c2c] truncate">{product.name}</p>
-                                            <p className="text-xs text-amber-600 font-semibold mt-0.5">JD {product.price?.toFixed(2)}</p>
-                                        </div>
-                                        <div className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">{product.count}</div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+        <div className="min-h-screen bg-[#faf7f2] text-[#2c2c2c]" dir="rtl">
+            {/* Best Sellers Bar */}
+            {bestSellers.length > 0 && (
+                <div className="bg-white border-b border-gray-200 py-3 px-4">
+                    <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">الأكثر مبيعاً</p>
+                    <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                        {bestSellers.map((p) => (
+                            <button
+                                key={p.id}
+                                onClick={() => openModal(p.id)}
+                                className="flex-shrink-0 flex items-center gap-2 bg-[#faf7f2] border border-gray-200 rounded-lg px-3 py-2 hover:border-gray-400 transition-colors"
+                            >
+                                {p.image && (
+                                    <Image
+                                        src={p.image}
+                                        alt={p.name}
+                                        width={36}
+                                        height={36}
+                                        className="w-9 h-9 object-cover rounded"
+                                    />
+                                )}
+                                <div className="text-right">
+                                    <p className="text-xs font-medium text-[#1a1a1a] whitespace-nowrap max-w-[100px] truncate">{p.name}</p>
+                                    <p className="text-xs text-gray-500">JD {discountedPrice(p).toFixed(2)}</p>
+                                </div>
+                            </button>
+                        ))}
                     </div>
                 </div>
             )}
 
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="w-full sm:w-2/3">
-                        <div className="relative">
-                            <input type="text" placeholder="ابحث عن منتج..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setVisibleCount(ITEMS_PER_LOAD); }} className="w-full px-4 py-3 sm:py-3.5 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm sm:text-base rounded-none" />
-                            <span className="absolute left-3 top-3 sm:top-3.5 text-gray-400">🔍</span>
-                        </div>
-                    </div>
-                    <div className="w-full sm:w-1/3 relative">
-                        <select value="" onChange={handleCategoryChange} className="w-full px-4 py-3 sm:py-3.5 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm sm:text-base appearance-none cursor-pointer rounded-none">
-                            <option value="">اختر تصنيف...</option>
-                            {selectedCategories.length === 0 && <option value="الكل">الكل</option>}
-                            {availableCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
-                        <div className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                        </div>
-                    </div>
-                </div>
-                {selectedCategories.length > 0 && (
-                    <div className="flex items-center gap-2 mt-4 flex-wrap">
-                        <span className="text-gray-500 text-sm">التصنيفات المختارة:</span>
-                        {selectedCategories.map(cat => <span key={cat} className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2c2c2c] text-white text-sm">{cat}<button onClick={() => removeCategory(cat)}>✕</button></span>)}
-                        <button onClick={clearCategories} className="text-xs text-red-500 hover:text-red-700 transition-colors">مسح الكل</button>
-                    </div>
-                )}
-                {searchQuery && (
-                    <div className="flex items-center gap-2 mt-4">
-                        <span className="text-gray-500 text-sm">الفلترة النشطة:</span>
-                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm">بحث: {searchQuery}<button onClick={() => { setSearchQuery(''); setVisibleCount(ITEMS_PER_LOAD); }}>✕</button></span>
-                    </div>
-                )}
-            </div>
-
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-                {visibleProducts.length === 0 ? (
-                    <div className="text-center py-12 sm:py-16">
-                        <p className="text-gray-500 text-base sm:text-lg">لا توجد منتجات مطابقة للبحث</p>
-                        <button onClick={() => { setSearchQuery(''); clearCategories(); setVisibleCount(ITEMS_PER_LOAD); }} className="mt-4 px-5 sm:px-6 py-2.5 sm:py-3 bg-[#2c2c2c] text-white hover:bg-gray-700 transition-colors text-sm sm:text-base rounded-none">إعادة تعيين</button>
-                    </div>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
-                            {visibleProducts.map(product => (
-                                <button key={product.id} onClick={() => openProductModal(product.id)} className="block text-right w-full">
-                                    <ProductCard product={product} onClick={() => openProductModal(product.id)} />
+            <div className="max-w-7xl mx-auto px-4 py-6">
+                {/* Search & Filters */}
+                <div className="mb-6 space-y-3">
+                    <input
+                        type="text"
+                        placeholder="ابحث عن منتج..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
+                    />
+                    {allCategories.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            {allCategories.map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => toggleCategory(cat)}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedCategories.includes(cat)
+                                            ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
+                                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'
+                                        }`}
+                                >
+                                    {cat}
                                 </button>
                             ))}
+                            {selectedCategories.length > 0 && (
+                                <button
+                                    onClick={() => setSelectedCategories([])}
+                                    className="px-3 py-1 rounded-full text-xs font-medium border border-red-300 text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                    مسح الفلاتر
+                                </button>
+                            )}
                         </div>
-                        <div ref={loaderRef} className="py-10 text-center">
-                            {loadingMore && <div className="flex items-center justify-center gap-2 text-gray-500"><div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div><span>جاري تحميل المزيد...</span></div>}
-                            {!hasMore && filteredProducts.length > ITEMS_PER_LOAD && <p className="text-gray-400 text-sm">تم عرض جميع المنتجات ✓</p>}
-                        </div>
-                    </>
+                    )}
+                </div>
+
+                {/* Product Grid */}
+                {displayed.length === 0 ? (
+                    <div className="text-center py-20 text-gray-400">
+                        <p className="text-lg">لا توجد منتجات مطابقة</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                        {displayed.map((product) => (
+                            <ProductCard
+                                key={product.id}
+                                product={product}
+                                onClick={() => openModal(product.id)}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {/* Infinite scroll loader */}
+                <div ref={loaderRef} className="h-10 mt-6" />
+                {!hasMore && displayed.length > 0 && (
+                    <p className="text-center text-sm text-gray-400 mt-2">تم عرض جميع المنتجات</p>
                 )}
             </div>
 
-            {/* ✅ Modal - شغال 100% */}
+            {/* Quick View Modal */}
             {modalProduct && (
-                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto">
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeModal} />
-                    <div className="relative bg-white w-full max-w-4xl my-8 mx-4 rounded-xl shadow-2xl z-10">
-                        <button onClick={closeModal} className="absolute top-4 right-4 z-20 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900 transition-colors">✕</button>
-                        {modalLoading ? (
-                            <div className="p-20 text-center"><div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#2c2c2c] border-r-transparent"></div><p className="mt-4 text-gray-500">جاري تحميل المنتج...</p></div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 md:p-8">
-                                <div className="bg-gray-50 rounded-lg flex items-center justify-center aspect-square">
-                                    {modalProduct.image ? <img src={modalProduct.image} alt={modalProduct.name} className="w-full h-full object-contain rounded-lg" /> : <span className="text-6xl">📷</span>}
-                                </div>
-                                <div>
-                                    <h2 className="text-2xl font-light text-[#2c2c2c] mb-2">{modalProduct.name}</h2>
-                                    <div className="mb-4">
-                                        {modalProduct.discount ? (
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-2xl text-[#2c2c2c] font-semibold">JD {(modalProduct.price - (modalProduct.price * modalProduct.discount / 100)).toFixed(2)}</span>
-                                                <span className="text-lg text-gray-400 line-through">JD {modalProduct.price.toFixed(2)}</span>
-                                                <span className="bg-red-100 text-red-800 px-2 py-1 text-sm rounded">-{modalProduct.discount}%</span>
-                                            </div>
-                                        ) : <span className="text-2xl text-[#2c2c2c] font-semibold">JD {modalProduct.price.toFixed(2)}</span>}
-                                    </div>
-                                    <p className="text-gray-600 mb-4 leading-relaxed">{modalProduct.description?.substring(0, 300)}...</p>
-                                    <div className="mb-4">{modalProduct.stock > 0 ? <span className="text-green-600 text-sm">✓ متوفر ({modalProduct.stock} قطعة)</span> : <span className="text-red-600 text-sm">✗ نفذت الكمية</span>}</div>
-                                    <div className="flex flex-wrap gap-2 mb-4">{modalProduct.categories?.map(cat => <span key={cat} className="text-xs bg-gray-200 text-[#2c2c2c] px-3 py-1 rounded">{cat}</span>)}</div>
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                    onClick={closeModal}
+                >
+                    <div
+                        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                        dir="rtl"
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                            <h2 className="font-semibold text-[#1a1a1a] text-lg truncate">{modalProduct.name}</h2>
+                            <button
+                                onClick={closeModal}
+                                className="text-gray-400 hover:text-[#1a1a1a] transition-colors p-1"
+                            >
+                                ✕
+                            </button>
+                        </div>
 
-                                    {/* ✅ رابط يفتح في Tab جديد */}
-                                    <div className="flex gap-3 mt-6">
-                                        <a
-                                            href={`/products/${modalProduct.id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex-1 text-center px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors rounded-lg"
-                                        >
-                                            عرض التفاصيل الكاملة ←
-                                        </a>
-                                    </div>
-
-                                    {modalRelated.length > 0 && (
-                                        <div className="mt-6 pt-4 border-t border-gray-200">
-                                            <h3 className="text-sm font-medium text-[#2c2c2c] mb-3">منتجات قد تعجبك</h3>
-                                            <div className="flex gap-2 overflow-x-auto">
-                                                {modalRelated.filter(p => p.stock > 0).slice(0, 4).map(rp => (
-                                                    <button key={rp.id} onClick={() => openProductModal(rp.id)} className="flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg overflow-hidden hover:ring-2 ring-amber-400 transition-all">
-                                                        {rp.image ? <img src={rp.image} alt={rp.name} className="w-full h-full object-cover" /> : <span className="text-2xl flex items-center justify-center h-full">📷</span>}
-                                                    </button>
-                                                ))}
-                                            </div>
+                        <div className="p-4 sm:p-6">
+                            <div className="flex flex-col sm:flex-row gap-5">
+                                {/* Image */}
+                                <div className="sm:w-1/2">
+                                    {modalProduct.image ? (
+                                        <div className="relative w-full pt-[100%] bg-gray-50 rounded-xl overflow-hidden">
+                                            <Image
+                                                src={modalProduct.image}
+                                                alt={modalProduct.name}
+                                                fill
+                                                className="object-cover"
+                                            />
+                                            {modalProduct.discount && modalProduct.discount > 0 && (
+                                                <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                                    -{modalProduct.discount}%
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="w-full pt-[100%] bg-gray-100 rounded-xl relative">
+                                            <span className="absolute inset-0 flex items-center justify-center text-4xl">📷</span>
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Info */}
+                                <div className="sm:w-1/2 flex flex-col gap-3">
+                                    {/* Price */}
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-2xl font-bold text-[#1a1a1a]">
+                                            JD {discountedPrice(modalProduct).toFixed(2)}
+                                        </span>
+                                        {modalProduct.discount && (
+                                            <span className="text-sm text-gray-400 line-through">
+                                                JD {modalProduct.price.toFixed(2)}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Stock */}
+                                    <p className={`text-sm font-medium ${modalProduct.stock === 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                        {modalProduct.stock === 0 ? 'غير متوفر' : `متوفر - ${modalProduct.stock} قطعة`}
+                                    </p>
+
+                                    {/* Description */}
+                                    {modalProduct.description && (
+                                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-4">
+                                            {modalProduct.description}
+                                        </p>
+                                    )}
+
+                                    {/* Categories */}
+                                    {modalProduct.categories.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {modalProduct.categories.map((cat) => (
+                                                <span
+                                                    key={cat}
+                                                    className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full"
+                                                >
+                                                    {cat}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Free shipping badge */}
+                                    {modalProduct.freeShipping && (
+                                        <p className="text-xs text-green-600 font-medium">🚚 توصيل مجاني</p>
+                                    )}
+
+                                    {/* Full details link */}
+                                    <Link
+                                        href={`/products/${modalProduct.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-auto inline-block text-center w-full py-3 border-2 border-[#1a1a1a] text-[#1a1a1a] rounded-lg text-sm font-medium hover:bg-[#1a1a1a] hover:text-white transition-colors"
+                                    >
+                                        عرض التفاصيل الكاملة ↗
+                                    </Link>
+                                </div>
                             </div>
-                        )}
+
+                            {/* Related Products */}
+                            {!loadingModal && relatedProducts.length > 0 && (
+                                <div className="mt-6">
+                                    <h3 className="text-sm font-semibold text-gray-500 mb-3">منتجات ذات صلة</h3>
+                                    <div className="flex gap-3 overflow-x-auto pb-1">
+                                        {relatedProducts.map((rp) => (
+                                            <button
+                                                key={rp.id}
+                                                onClick={() => openModal(rp.id)}
+                                                className="flex-shrink-0 w-24 text-right hover:opacity-80 transition-opacity"
+                                            >
+                                                {rp.image && (
+                                                    <div className="relative w-24 h-24 bg-gray-50 rounded-lg overflow-hidden mb-1">
+                                                        <Image src={rp.image} alt={rp.name} fill className="object-cover" />
+                                                    </div>
+                                                )}
+                                                <p className="text-xs text-[#1a1a1a] font-medium truncate">{rp.name}</p>
+                                                <p className="text-xs text-gray-500">JD {discountedPrice(rp).toFixed(2)}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {loadingModal && (
+                                <div className="mt-4 flex justify-center">
+                                    <div className="w-5 h-5 border-2 border-gray-300 border-t-[#1a1a1a] rounded-full animate-spin" />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
