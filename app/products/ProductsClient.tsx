@@ -8,7 +8,7 @@ import { getAllProducts } from '@/app/lib/products';
 import { getBestSellers } from '@/app/lib/orders';
 import type { Product } from '@/app/lib/products';
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_LOAD = 12;
 
 export default function ProductsClient() {
     const router = useRouter();
@@ -22,8 +22,10 @@ export default function ProductsClient() {
         searchParams.get('categories')?.split(',').filter(Boolean) || []
     );
     const [allCategories, setAllCategories] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
+    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [loading, setLoading] = useState(true);
+    const loaderRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         async function load() {
@@ -40,20 +42,18 @@ export default function ProductsClient() {
         load();
     }, []);
 
-    // ✅ مزامنة الحالة مع URL - مع منع أول تنفيذ
+    // ✅ مزامنة الحالة مع URL
     useEffect(() => {
         if (firstRender.current) {
             firstRender.current = false;
             return;
         }
-
         const params = new URLSearchParams();
         if (search) params.set('search', search);
-        if (currentPage > 1) params.set('page', currentPage.toString());
         if (selectedCategories.length) params.set('categories', selectedCategories.join(','));
         const query = params.toString();
         router.replace(`/products${query ? '?' + query : ''}`, { scroll: false });
-    }, [search, currentPage, selectedCategories, router]);
+    }, [search, selectedCategories, router]);
 
     // ✅ حفظ التمرير عند النقر على منتج
     useEffect(() => {
@@ -62,7 +62,6 @@ export default function ProductsClient() {
             const link = target.closest('a');
             if (link?.href?.includes('/products/') && !link.href.endsWith('/products')) {
                 sessionStorage.setItem('products_scroll', window.scrollY.toString());
-                sessionStorage.setItem('products_page', currentPage.toString());
             }
         };
         document.addEventListener('click', handleClick);
@@ -72,21 +71,13 @@ export default function ProductsClient() {
     // ✅ استعادة التمرير بعد تحميل المنتجات
     useEffect(() => {
         if (loading) return;
-
         const saved = sessionStorage.getItem('products_scroll');
-        const savedPage = sessionStorage.getItem('products_page');
-
         if (saved) {
             const y = parseInt(saved);
             if (y > 0) {
                 requestAnimationFrame(() => window.scrollTo(0, y));
             }
             sessionStorage.removeItem('products_scroll');
-        }
-
-        if (savedPage) {
-            setCurrentPage(parseInt(savedPage));
-            sessionStorage.removeItem('products_page');
         }
     }, [loading]);
 
@@ -98,19 +89,32 @@ export default function ProductsClient() {
         });
     }, [allProducts, search, selectedCategories]);
 
-    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-    const paginated = useMemo(() => {
-        const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filtered.slice(start, start + ITEMS_PER_PAGE);
-    }, [filtered, currentPage]);
-
-    // ✅ إعادة تعيين الصفحة عند تغيير البحث أو التصنيفات
+    // ✅ Intersection Observer - Infinite Scroll
     useEffect(() => {
-        setCurrentPage(1);
-        window.scrollTo(0, 0);
-    }, [search, selectedCategories]);
+        const currentLoader = loaderRef.current;
+        if (!currentLoader) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && !loadingMore && visibleCount < filtered.length) {
+                    setLoadingMore(true);
+                    setTimeout(() => {
+                        setVisibleCount(prev => prev + ITEMS_PER_LOAD);
+                        setLoadingMore(false);
+                    }, 300);
+                }
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(currentLoader);
+        return () => observer.disconnect();
+    }, [loadingMore, visibleCount, filtered.length]);
+
+    const visibleProducts = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+    const hasMore = visibleCount < filtered.length;
 
     const toggleCategory = (cat: string) => {
+        setVisibleCount(ITEMS_PER_LOAD);
+        window.scrollTo(0, 0);
         setSelectedCategories(prev =>
             prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
         );
@@ -163,7 +167,11 @@ export default function ProductsClient() {
                         type="text"
                         placeholder="ابحث عن منتج..."
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={e => {
+                            setSearch(e.target.value);
+                            setVisibleCount(ITEMS_PER_LOAD);
+                            window.scrollTo(0, 0);
+                        }}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
                     />
                     {allCategories.length > 0 && (
@@ -173,8 +181,8 @@ export default function ProductsClient() {
                                     key={cat}
                                     onClick={() => toggleCategory(cat)}
                                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedCategories.includes(cat)
-                                            ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
-                                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'
+                                        ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'
                                         }`}
                                 >
                                     {cat}
@@ -182,7 +190,11 @@ export default function ProductsClient() {
                             ))}
                             {selectedCategories.length > 0 && (
                                 <button
-                                    onClick={() => setSelectedCategories([])}
+                                    onClick={() => {
+                                        setSelectedCategories([]);
+                                        setVisibleCount(ITEMS_PER_LOAD);
+                                        window.scrollTo(0, 0);
+                                    }}
                                     className="px-3 py-1 rounded-full text-xs font-medium border border-red-300 text-red-500 hover:bg-red-50 transition-colors"
                                 >
                                     مسح الفلاتر
@@ -192,48 +204,31 @@ export default function ProductsClient() {
                     )}
                 </div>
 
-                {/* Product Grid */}
-                {paginated.length === 0 ? (
+                {/* Product Grid - Infinite Scroll */}
+                {visibleProducts.length === 0 ? (
                     <div className="text-center py-20 text-gray-400">
                         <p className="text-lg">لا توجد منتجات مطابقة</p>
                     </div>
                 ) : (
                     <>
-                        {/* ⚠️ هام: بدون Link خارجي - ProductCard يحتوي على Link داخلي */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                            {paginated.map(product => (
+                            {visibleProducts.map(product => (
                                 <ProductCard key={product.id} product={product} />
                             ))}
                         </div>
 
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                                <div className="flex justify-center items-center gap-3 mt-8">
-                                    <button
-                                        onClick={() => {
-                                            setCurrentPage(p => Math.max(1, p - 1));
-                                            window.scrollTo(0, 0);
-                                        }}
-                                        disabled={currentPage === 1}
-                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                    >
-                                        السابق
-                                    </button>
-                                    <span className="text-gray-700">
-                                        {currentPage} / {totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => {
-                                            setCurrentPage(p => Math.min(totalPages, p + 1));
-                                            window.scrollTo(0, 0);
-                                        }}
-                                        disabled={currentPage === totalPages}
-                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                    >
-                                        التالي
-                                    </button>
+                        {/* Infinite Scroll Loader */}
+                        <div ref={loaderRef} className="py-10 text-center">
+                            {loadingMore && (
+                                <div className="flex items-center justify-center gap-2 text-gray-500">
+                                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                    <span>جاري تحميل المزيد...</span>
                                 </div>
-                        )}
+                            )}
+                            {!hasMore && filtered.length > ITEMS_PER_LOAD && (
+                                <p className="text-gray-400 text-sm">تم عرض جميع المنتجات ✓</p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>
