@@ -8,7 +8,7 @@ import { getAllProducts } from '@/app/lib/products';
 import { getBestSellers } from '@/app/lib/orders';
 import type { Product } from '@/app/lib/products';
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_LOAD = 12;
 
 export default function ProductsClient() {
     const router = useRouter();
@@ -22,8 +22,10 @@ export default function ProductsClient() {
         searchParams.get('categories')?.split(',').filter(Boolean) || []
     );
     const [allCategories, setAllCategories] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
+    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [loading, setLoading] = useState(true);
+    const loaderRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         async function load() {
@@ -36,17 +38,16 @@ export default function ProductsClient() {
         load();
     }, []);
 
-    // ✅ مزامنة URL - مع منع أول تنفيذ
+    // ✅ مزامنة URL
     useEffect(() => {
         if (firstRender.current) { firstRender.current = false; return; }
         const params = new URLSearchParams();
         if (search) params.set('search', search);
-        if (currentPage > 1) params.set('page', currentPage.toString());
         if (selectedCategories.length) params.set('categories', selectedCategories.join(','));
         router.replace(`/products${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
-    }, [search, currentPage, selectedCategories, router]);
+    }, [search, selectedCategories, router]);
 
-    // ✅ حفظ التمرير والصفحة في URL عند النقر على منتج
+    // ✅ حفظ التمرير في URL عند النقر على منتج
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
@@ -54,32 +55,25 @@ export default function ProductsClient() {
             if (link?.href?.includes('/products/') && !link.href.endsWith('/products')) {
                 const url = new URL(window.location.href);
                 url.searchParams.set('scroll', window.scrollY.toString());
-                url.searchParams.set('page', currentPage.toString());
                 window.history.replaceState({}, '', url.toString());
             }
         };
         document.addEventListener('click', handleClick);
         return () => document.removeEventListener('click', handleClick);
-    }, [currentPage]);
+    }, []);
 
-    // ✅ استعادة التمرير والصفحة بعد التحميل
+    // ✅ استعادة التمرير بعد التحميل
     useEffect(() => {
         if (loading) return;
         const scrollParam = searchParams.get('scroll');
-        const pageParam = searchParams.get('page');
-        if (pageParam) setCurrentPage(parseInt(pageParam));
         if (scrollParam) {
             const y = parseInt(scrollParam);
             if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y));
             const url = new URL(window.location.href);
             url.searchParams.delete('scroll');
-            url.searchParams.delete('page');
             window.history.replaceState({}, '', url.toString());
         }
     }, [loading, searchParams]);
-
-    // ❌ هذا الـ useEffect المحذوف كان السبب الرئيسي
-    // useEffect(() => { setCurrentPage(1); }, [search, selectedCategories]);
 
     const filtered = useMemo(() => {
         return allProducts.filter(p => {
@@ -89,14 +83,33 @@ export default function ProductsClient() {
         });
     }, [allProducts, search, selectedCategories]);
 
-    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-    const paginated = useMemo(() => filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE), [filtered, currentPage]);
+    // ✅ Intersection Observer - Infinite Scroll
+    useEffect(() => {
+        const currentLoader = loaderRef.current;
+        if (!currentLoader) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && !loadingMore && visibleCount < filtered.length) {
+                    setLoadingMore(true);
+                    setTimeout(() => {
+                        setVisibleCount(prev => prev + ITEMS_PER_LOAD);
+                        setLoadingMore(false);
+                    }, 300);
+                }
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(currentLoader);
+        return () => observer.disconnect();
+    }, [loadingMore, visibleCount, filtered.length]);
 
-    // ✅ معالج التصنيف - يضبط currentPage مباشرة
+    const visibleProducts = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+    const hasMore = visibleCount < filtered.length;
+
     const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
-        setCurrentPage(1);
         window.scrollTo(0, 0);
+        setVisibleCount(ITEMS_PER_LOAD);
         if (!value) setSelectedCategories([]);
         else setSelectedCategories([value]);
     };
@@ -122,7 +135,7 @@ export default function ProductsClient() {
                     <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">الأكثر مبيعاً</p>
                     <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
                         {bestSellers.map(p => (
-                            <Link key={p.id} href={`/products/${p.id}`} className="flex-shrink-0 flex items-center gap-2 bg-[#faf7f2] border border-gray-200 rounded-lg px-3 py-2 hover:border-gray-400 transition-colors">
+                            <Link key={p.id} href={`/products/${p.id}`} scroll={false} className="flex-shrink-0 flex items-center gap-2 bg-[#faf7f2] border border-gray-200 rounded-lg px-3 py-2 hover:border-gray-400 transition-colors">
                                 {p.image && <img src={p.image} alt={p.name} width={36} height={36} className="w-9 h-9 object-cover rounded" />}
                                 <div className="text-right">
                                     <p className="text-xs font-medium text-[#1a1a1a] whitespace-nowrap max-w-[100px] truncate">{p.name}</p>
@@ -135,7 +148,7 @@ export default function ProductsClient() {
             )}
 
             <div className="max-w-7xl mx-auto px-4 py-6">
-                {/* ✅ Search + Category Dropdown في سطر واحد */}
+                {/* Search + Category Dropdown */}
                 <div className="mb-6 flex gap-3 items-center">
                     <input
                         type="text"
@@ -143,43 +156,40 @@ export default function ProductsClient() {
                         value={search}
                         onChange={(e) => {
                             setSearch(e.target.value);
-                            setCurrentPage(1);
                             window.scrollTo(0, 0);
+                            setVisibleCount(ITEMS_PER_LOAD);
                         }}
                         className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
                     />
-
                     <select
                         value={selectedCategories[0] || ''}
                         onChange={handleCategoryChange}
                         className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white min-w-[180px] focus:outline-none focus:border-[#1a1a1a] transition-colors"
                     >
                         <option value="">جميع التصنيفات</option>
-                        {allCategories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                        ))}
+                        {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                 </div>
 
-                {/* Product Grid */}
-                {paginated.length === 0 ? (
+                {/* Product Grid - Infinite Scroll */}
+                {visibleProducts.length === 0 ? (
                     <div className="text-center py-20 text-gray-400"><p className="text-lg">لا توجد منتجات مطابقة</p></div>
                 ) : (
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                            {paginated.map(product => (
+                            {visibleProducts.map(product => (
                                 <ProductCard key={product.id} product={product} />
                             ))}
                         </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-3 mt-8">
-                                <button onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }} disabled={currentPage === 1} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition">السابق</button>
-                                <span className="text-gray-700">{currentPage} / {totalPages}</span>
-                                <button onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }} disabled={currentPage === totalPages} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition">التالي</button>
-                            </div>
-                        )}
+                        <div ref={loaderRef} className="py-10 text-center">
+                            {loadingMore && (
+                                <div className="flex items-center justify-center gap-2 text-gray-500">
+                                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                    <span>جاري تحميل المزيد...</span>
+                                </div>
+                            )}
+                            {!hasMore && filtered.length > ITEMS_PER_LOAD && <p className="text-gray-400 text-sm">تم عرض جميع المنتجات ✓</p>}
+                        </div>
                     </>
                 )}
             </div>
