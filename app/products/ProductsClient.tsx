@@ -18,8 +18,8 @@ export default function ProductsClient() {
     const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [bestSellers, setBestSellers] = useState<any[]>([]);
     const [search, setSearch] = useState(searchParams.get('search') || '');
-    const [selectedCategories, setSelectedCategories] = useState<string[]>(
-        searchParams.get('categories')?.split(',').filter(Boolean) || []
+    const [selectedCategory, setSelectedCategory] = useState<string>(
+        searchParams.get('categories') || ''
     );
     const [allCategories, setAllCategories] = useState<string[]>([]);
     const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
@@ -42,7 +42,7 @@ export default function ProductsClient() {
         load();
     }, []);
 
-    // ✅ مزامنة الحالة مع URL
+    // مزامنة URL
     useEffect(() => {
         if (firstRender.current) {
             firstRender.current = false;
@@ -50,46 +50,65 @@ export default function ProductsClient() {
         }
         const params = new URLSearchParams();
         if (search) params.set('search', search);
-        if (selectedCategories.length) params.set('categories', selectedCategories.join(','));
-        const query = params.toString();
-        router.replace(`/products${query ? '?' + query : ''}`, { scroll: false });
-    }, [search, selectedCategories, router]);
+        if (selectedCategory) params.set('categories', selectedCategory);
+        router.replace(`/products${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
+    }, [search, selectedCategory, router]);
 
-    // ✅ حفظ التمرير عند النقر على منتج
+    // حفظ التمرير + visibleCount عند النقر على منتج
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const link = target.closest('a');
             if (link?.href?.includes('/products/') && !link.href.endsWith('/products')) {
                 sessionStorage.setItem('products_scroll', window.scrollY.toString());
+                sessionStorage.setItem('products_visibleCount', visibleCount.toString());
             }
         };
         document.addEventListener('click', handleClick);
         return () => document.removeEventListener('click', handleClick);
-    }, []);
+    }, [visibleCount]);
 
-    // ✅ استعادة التمرير بعد تحميل المنتجات
+    // استعادة التمرير و visibleCount بعد تحميل البيانات
     useEffect(() => {
         if (loading) return;
-        const saved = sessionStorage.getItem('products_scroll');
-        if (saved) {
-            const y = parseInt(saved);
-            if (y > 0) {
-                requestAnimationFrame(() => window.scrollTo(0, y));
+
+        const savedScroll = sessionStorage.getItem('products_scroll');
+        const savedVisibleCount = sessionStorage.getItem('products_visibleCount');
+
+        // استعادة visibleCount أولاً لضمان وجود محتوى كافٍ
+        if (savedVisibleCount) {
+            const vc = parseInt(savedVisibleCount);
+            if (vc > visibleCount) {
+                setVisibleCount(vc);
             }
-            sessionStorage.removeItem('products_scroll');
         }
-    }, [loading]);
+
+        // استعادة التمرير
+        if (savedScroll) {
+            const y = parseInt(savedScroll);
+            if (y > 0) {
+                // انتظر قليلاً حتى يتمدد المحتوى إذا تغير visibleCount
+                const timer = setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        window.scrollTo(0, y);
+                    });
+                }, 100);
+                sessionStorage.removeItem('products_scroll');
+                sessionStorage.removeItem('products_visibleCount');
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [loading, visibleCount]);
 
     const filtered = useMemo(() => {
         return allProducts.filter(p => {
             const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase());
-            const matchCat = selectedCategories.length === 0 || selectedCategories.some(c => p.categories.includes(c));
+            const matchCat = !selectedCategory || p.categories.includes(selectedCategory);
             return matchSearch && matchCat;
         });
-    }, [allProducts, search, selectedCategories]);
+    }, [allProducts, search, selectedCategory]);
 
-    // ✅ Intersection Observer - Infinite Scroll
+    // Intersection Observer للتحميل اللانهائي
     useEffect(() => {
         const currentLoader = loaderRef.current;
         if (!currentLoader) return;
@@ -112,16 +131,16 @@ export default function ProductsClient() {
     const visibleProducts = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
     const hasMore = visibleCount < filtered.length;
 
-    const toggleCategory = (cat: string) => {
-        setVisibleCount(ITEMS_PER_LOAD);
-        window.scrollTo(0, 0);
-        setSelectedCategories(prev =>
-            prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
-        );
-    };
-
     const discountedPrice = (p: Product) =>
         p.discount ? p.price - (p.price * p.discount) / 100 : p.price;
+
+    // معالج تغيير التصنيف من القائمة المنسدلة
+    const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        setSelectedCategory(value);
+        setVisibleCount(ITEMS_PER_LOAD);
+        window.scrollTo(0, 0);
+    };
 
     if (loading) {
         return (
@@ -161,8 +180,8 @@ export default function ProductsClient() {
             )}
 
             <div className="max-w-7xl mx-auto px-4 py-6">
-                {/* Search & Filters */}
-                <div className="mb-6 space-y-3">
+                {/* Search + Category Dropdown */}
+                <div className="mb-6 flex gap-3 items-center">
                     <input
                         type="text"
                         placeholder="ابحث عن منتج..."
@@ -172,39 +191,21 @@ export default function ProductsClient() {
                             setVisibleCount(ITEMS_PER_LOAD);
                             window.scrollTo(0, 0);
                         }}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
                     />
-                    {allCategories.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                            {allCategories.map(cat => (
-                                <button
-                                    key={cat}
-                                    onClick={() => toggleCategory(cat)}
-                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedCategories.includes(cat)
-                                        ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
-                                        : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'
-                                        }`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                            {selectedCategories.length > 0 && (
-                                <button
-                                    onClick={() => {
-                                        setSelectedCategories([]);
-                                        setVisibleCount(ITEMS_PER_LOAD);
-                                        window.scrollTo(0, 0);
-                                    }}
-                                    className="px-3 py-1 rounded-full text-xs font-medium border border-red-300 text-red-500 hover:bg-red-50 transition-colors"
-                                >
-                                    مسح الفلاتر
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    <select
+                        value={selectedCategory}
+                        onChange={handleCategoryChange}
+                        className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white min-w-[180px] focus:outline-none focus:border-[#1a1a1a] transition-colors"
+                    >
+                        <option value="">جميع التصنيفات</option>
+                        {allCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
                 </div>
 
-                {/* Product Grid - Infinite Scroll */}
+                {/* Product Grid */}
                 {visibleProducts.length === 0 ? (
                     <div className="text-center py-20 text-gray-400">
                         <p className="text-lg">لا توجد منتجات مطابقة</p>
@@ -216,8 +217,6 @@ export default function ProductsClient() {
                                 <ProductCard key={product.id} product={product} />
                             ))}
                         </div>
-
-                        {/* Infinite Scroll Loader */}
                         <div ref={loaderRef} className="py-10 text-center">
                             {loadingMore && (
                                 <div className="flex items-center justify-center gap-2 text-gray-500">
