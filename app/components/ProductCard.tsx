@@ -30,27 +30,18 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
         setShowModal(false);
     };
 
-    // ✅ مكون الصورة مشترك
+    // ✅ مكون الصورة
     const ProductImage = () => (
         <div className="relative w-full pt-[100%] bg-gray-50">
             <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
                 {product.image ? (
-                    <Image
-                        src={product.image}
-                        alt={product.name}
-                        width={300}
-                        height={300}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                        quality={80}
-                    />
+                    <Image src={product.image} alt={product.name} width={300} height={300} className="w-full h-full object-cover" loading="lazy" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" quality={80} />
                 ) : '📷'}
             </div>
         </div>
     );
 
-    // ✅ مكون المحتوى مشترك (بدون الروابط)
+    // ✅ مكون المحتوى
     const ProductContent = () => (
         <>
             {/* Mobile */}
@@ -59,16 +50,23 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-1">
                         <span className="text-[#1a1a1a] text-base font-semibold">JD {discountedPrice.toFixed(2)}</span>
-                        {product.discount && (
-                            <span className="text-gray-400 text-xs line-through">JD {product.price.toFixed(2)}</span>
-                        )}
+                        {product.discount && <span className="text-gray-400 text-xs line-through">JD {product.price.toFixed(2)}</span>}
                     </div>
                     <div className="text-xs text-gray-500">{product.stock} قطعة</div>
                 </div>
                 {isOutOfStock ? (
                     <button disabled className="w-full py-2 bg-gray-200 text-gray-500 cursor-not-allowed rounded text-sm">غير متوفر</button>
                 ) : (
-                    <button onClick={(e) => { e.stopPropagation(); setShowModal(true); }} className="w-full py-2 bg-[#1a1a1a] text-white hover:bg-gray-800 rounded text-sm">إضافة للسلة</button>
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowModal(true);
+                        }}
+                        className="w-full py-2 bg-[#1a1a1a] text-white hover:bg-gray-800 rounded text-sm"
+                    >
+                        إضافة للسلة
+                    </button>
                 )}
             </div>
 
@@ -94,7 +92,16 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
                 {isOutOfStock ? (
                     <button disabled className="w-full py-3 bg-gray-200 text-gray-500 border border-gray-200 cursor-not-allowed text-sm rounded">غير متوفر</button>
                 ) : (
-                    <button onClick={(e) => { e.stopPropagation(); setShowModal(true); }} className="w-full py-3 bg-[#1a1a1a] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded">إضافة للسلة</button>
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowModal(true);
+                        }}
+                        className="w-full py-3 bg-[#1a1a1a] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded"
+                    >
+                        إضافة للسلة
+                    </button>
                 )}
             </div>
         </>
@@ -113,33 +120,22 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
                     <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-20 bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg whitespace-nowrap">🚚 توصيل مجاني</div>
                 )}
 
-                {/* ✅ الصورة: إذا فيه onClick نستخدم button، وإلا Link مع scroll=false */}
+                {/* ✅ البطاقة كاملة رابط واحد - مع استثناء زر السلة */}
                 {onClick ? (
                     <button onClick={onClick} className="block w-full text-left cursor-pointer">
                         <ProductImage />
-                    </button>
-                ) : (
-                    <Link href={`/products/${product.id}`} scroll={false} className="block relative w-full">
-                        <ProductImage />
-                    </Link>
-                )}
-
-                {/* ✅ المحتوى بدون رابط */}
-                {onClick ? (
-                    <button onClick={onClick} className="block w-full text-left cursor-pointer">
                         <ProductContent />
                     </button>
                 ) : (
-                    <ProductContent />
+                    <Link href={`/products/${product.id}`} scroll={false} className="block">
+                        <ProductImage />
+                        <ProductContent />
+                    </Link>
                 )}
             </div>
 
             {showModal && (
-                <QuantityModal
-                    product={product}
-                    onClose={() => setShowModal(false)}
-                    onAdd={handleAddToCart}
-                />
+                <QuantityModal product={product} onClose={() => setShowModal(false)} onAdd={handleAddToCart} />
             )}
         </>
     );
