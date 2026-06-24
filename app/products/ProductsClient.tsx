@@ -40,7 +40,7 @@ export default function ProductsClient() {
         load();
     }, []);
 
-    // ✅ مزامنة الحالة مع URL - مع منع أول تنفيذ
+    // مزامنة الحالة مع URL - مع منع أول تنفيذ
     useEffect(() => {
         if (firstRender.current) {
             firstRender.current = false;
@@ -55,40 +55,45 @@ export default function ProductsClient() {
         router.replace(`/products${query ? '?' + query : ''}`, { scroll: false });
     }, [search, currentPage, selectedCategories, router]);
 
-    // ✅ حفظ التمرير عند النقر على منتج
+    // حفظ التمرير والصفحة في URL عند النقر على منتج
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const link = target.closest('a');
             if (link?.href?.includes('/products/') && !link.href.endsWith('/products')) {
-                sessionStorage.setItem('products_scroll', window.scrollY.toString());
-                sessionStorage.setItem('products_page', currentPage.toString());
+                const url = new URL(window.location.href);
+                url.searchParams.set('scroll', window.scrollY.toString());
+                url.searchParams.set('page', currentPage.toString());
+                window.history.replaceState({}, '', url.toString());
             }
         };
         document.addEventListener('click', handleClick);
         return () => document.removeEventListener('click', handleClick);
-    }, []);
+    }, [currentPage]);
 
-    // ✅ استعادة التمرير بعد تحميل المنتجات
+    // استعادة التمرير والصفحة
     useEffect(() => {
         if (loading) return;
 
-        const saved = sessionStorage.getItem('products_scroll');
-        const savedPage = sessionStorage.getItem('products_page');
+        const scrollParam = searchParams.get('scroll');
+        const pageParam = searchParams.get('page');
 
-        if (saved) {
-            const y = parseInt(saved);
+        if (pageParam) {
+            setCurrentPage(parseInt(pageParam));
+        }
+
+        if (scrollParam) {
+            const y = parseInt(scrollParam);
             if (y > 0) {
                 requestAnimationFrame(() => window.scrollTo(0, y));
             }
-            sessionStorage.removeItem('products_scroll');
-        }
 
-        if (savedPage) {
-            setCurrentPage(parseInt(savedPage));
-            sessionStorage.removeItem('products_page');
+            const url = new URL(window.location.href);
+            url.searchParams.delete('scroll');
+            url.searchParams.delete('page');
+            window.history.replaceState({}, '', url.toString());
         }
-    }, [loading]);
+    }, [loading, searchParams]);
 
     const filtered = useMemo(() => {
         return allProducts.filter(p => {
@@ -104,20 +109,30 @@ export default function ProductsClient() {
         return filtered.slice(start, start + ITEMS_PER_PAGE);
     }, [filtered, currentPage]);
 
-    // ✅ إعادة تعيين الصفحة عند تغيير البحث أو التصنيفات
-    useEffect(() => {
+    // ✅ إضافة تصنيف من القائمة المنسدلة
+    const handleCategorySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (!value) return;
+
+        if (!selectedCategories.includes(value)) {
+            setSelectedCategories([...selectedCategories, value]);
+            setCurrentPage(1);
+            window.scrollTo(0, 0);
+        }
+    };
+
+    // ✅ إزالة تصنيف
+    const removeCategory = (cat: string) => {
+        setSelectedCategories(prev => prev.filter(c => c !== cat));
         setCurrentPage(1);
         window.scrollTo(0, 0);
-    }, [search, selectedCategories]);
-
-    const toggleCategory = (cat: string) => {
-        setSelectedCategories(prev =>
-            prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
-        );
     };
 
     const discountedPrice = (p: Product) =>
         p.discount ? p.price - (p.price * p.discount) / 100 : p.price;
+
+    // التصنيفات المتاحة (غير المختارة)
+    const availableCategories = allCategories.filter(c => !selectedCategories.includes(c));
 
     if (loading) {
         return (
@@ -159,34 +174,68 @@ export default function ProductsClient() {
             <div className="max-w-7xl mx-auto px-4 py-6">
                 {/* Search & Filters */}
                 <div className="mb-6 space-y-3">
+                    {/* Search */}
                     <input
                         type="text"
                         placeholder="ابحث عن منتج..."
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={(e) => {
+                            setSearch(e.target.value);
+                            setCurrentPage(1);
+                            window.scrollTo(0, 0);
+                        }}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
                     />
+
+                    {/* ✅ Category Select Dropdown */}
                     {allCategories.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                            {allCategories.map(cat => (
-                                <button
-                                    key={cat}
-                                    onClick={() => toggleCategory(cat)}
-                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedCategories.includes(cat)
-                                            ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
-                                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'
-                                        }`}
+                        <div className="flex flex-col gap-2">
+                            <div className="relative w-full sm:w-1/3">
+                                <select
+                                    value=""
+                                    onChange={handleCategorySelect}
+                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm appearance-none cursor-pointer rounded-lg"
                                 >
-                                    {cat}
-                                </button>
-                            ))}
+                                    <option value="">اختر تصنيف...</option>
+                                    {availableCategories.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                                <div className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            {/* ✅ Chips/Badges للتصنيفات المختارة */}
                             {selectedCategories.length > 0 && (
-                                <button
-                                    onClick={() => setSelectedCategories([])}
-                                    className="px-3 py-1 rounded-full text-xs font-medium border border-red-300 text-red-500 hover:bg-red-50 transition-colors"
-                                >
-                                    مسح الفلاتر
-                                </button>
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedCategories.map(cat => (
+                                        <span
+                                            key={cat}
+                                            className="inline-flex items-center gap-1 px-3 py-1 bg-[#1a1a1a] text-white text-xs font-medium rounded-full"
+                                        >
+                                            {cat}
+                                            <button
+                                                onClick={() => removeCategory(cat)}
+                                                className="text-gray-300 hover:text-white transition-colors"
+                                            >
+                                                ✕
+                                            </button>
+                                        </span>
+                                    ))}
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCategories([]);
+                                            setCurrentPage(1);
+                                            window.scrollTo(0, 0);
+                                        }}
+                                        className="px-3 py-1 rounded-full text-xs font-medium border border-red-300 text-red-500 hover:bg-red-50 transition-colors"
+                                    >
+                                        مسح الكل
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}
@@ -199,7 +248,6 @@ export default function ProductsClient() {
                     </div>
                 ) : (
                     <>
-                        {/* ⚠️ هام: بدون Link خارجي - ProductCard يحتوي على Link داخلي */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                             {paginated.map(product => (
                                 <ProductCard key={product.id} product={product} />
@@ -208,31 +256,31 @@ export default function ProductsClient() {
 
                         {/* Pagination */}
                         {totalPages > 1 && (
-                                <div className="flex justify-center items-center gap-3 mt-8">
-                                    <button
-                                        onClick={() => {
-                                            setCurrentPage(p => Math.max(1, p - 1));
-                                            window.scrollTo(0, 0);
-                                        }}
-                                        disabled={currentPage === 1}
-                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                    >
-                                        السابق
-                                    </button>
-                                    <span className="text-gray-700">
-                                        {currentPage} / {totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => {
-                                            setCurrentPage(p => Math.min(totalPages, p + 1));
-                                            window.scrollTo(0, 0);
-                                        }}
-                                        disabled={currentPage === totalPages}
-                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                    >
-                                        التالي
-                                    </button>
-                                </div>
+                            <div className="flex justify-center items-center gap-3 mt-8">
+                                <button
+                                    onClick={() => {
+                                        setCurrentPage(p => Math.max(1, p - 1));
+                                        window.scrollTo(0, 0);
+                                    }}
+                                    disabled={currentPage === 1}
+                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                    السابق
+                                </button>
+                                <span className="text-gray-700">
+                                    {currentPage} / {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => {
+                                        setCurrentPage(p => Math.min(totalPages, p + 1));
+                                        window.scrollTo(0, 0);
+                                    }}
+                                    disabled={currentPage === totalPages}
+                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                    التالي
+                                </button>
+                            </div>
                         )}
                     </>
                 )}
