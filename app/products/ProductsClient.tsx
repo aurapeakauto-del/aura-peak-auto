@@ -8,7 +8,7 @@ import { getAllProducts } from '@/app/lib/products';
 import { getBestSellers } from '@/app/lib/orders';
 import type { Product } from '@/app/lib/products';
 
-const ITEMS_PER_LOAD = 12;
+const ITEMS_PER_PAGE = 12;
 
 export default function ProductsClient() {
     const router = useRouter();
@@ -22,10 +22,8 @@ export default function ProductsClient() {
         searchParams.get('categories') || ''
     );
     const [allCategories, setAllCategories] = useState<string[]>([]);
-    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
-    const [loadingMore, setLoadingMore] = useState(false);
+    const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
     const [loading, setLoading] = useState(true);
-    const loaderRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         async function load() {
@@ -35,70 +33,65 @@ export default function ProductsClient() {
             ]);
             setAllProducts(products);
             setBestSellers(sellers);
-            const cats = Array.from(new Set(products.flatMap(p => p.categories)));
-            setAllCategories(cats);
+            setAllCategories(Array.from(new Set(products.flatMap(p => p.categories))));
             setLoading(false);
         }
         load();
     }, []);
 
-    // مزامنة URL
+    // مزامنة URL (بدون التسبب في إعادة تعيين الصفحة)
     useEffect(() => {
         if (firstRender.current) {
             firstRender.current = false;
             return;
         }
+
         const params = new URLSearchParams();
         if (search) params.set('search', search);
+        if (currentPage > 1) params.set('page', currentPage.toString());
         if (selectedCategory) params.set('categories', selectedCategory);
-        router.replace(`/products${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
-    }, [search, selectedCategory, router]);
+        const query = params.toString();
+        router.replace(`/products${query ? '?' + query : ''}`, { scroll: false });
+    }, [search, currentPage, selectedCategory, router]);
 
-    // حفظ التمرير + visibleCount عند النقر على منتج
+    // حفظ التمرير ورقم الصفحة عند النقر على منتج
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const link = target.closest('a');
             if (link?.href?.includes('/products/') && !link.href.endsWith('/products')) {
                 sessionStorage.setItem('products_scroll', window.scrollY.toString());
-                sessionStorage.setItem('products_visibleCount', visibleCount.toString());
+                sessionStorage.setItem('products_page', currentPage.toString());
             }
         };
         document.addEventListener('click', handleClick);
         return () => document.removeEventListener('click', handleClick);
-    }, [visibleCount]);
+    }, [currentPage]);
 
-    // استعادة التمرير و visibleCount بعد تحميل البيانات
+    // استعادة التمرير ورقم الصفحة بعد تحميل البيانات
     useEffect(() => {
         if (loading) return;
 
+        const savedPage = sessionStorage.getItem('products_page');
         const savedScroll = sessionStorage.getItem('products_scroll');
-        const savedVisibleCount = sessionStorage.getItem('products_visibleCount');
 
-        // استعادة visibleCount أولاً لضمان وجود محتوى كافٍ
-        if (savedVisibleCount) {
-            const vc = parseInt(savedVisibleCount);
-            if (vc > visibleCount) {
-                setVisibleCount(vc);
-            }
+        if (savedPage) {
+            const page = parseInt(savedPage);
+            if (page > 1) setCurrentPage(page);
+            sessionStorage.removeItem('products_page');
         }
 
-        // استعادة التمرير
         if (savedScroll) {
             const y = parseInt(savedScroll);
             if (y > 0) {
-                // انتظر قليلاً حتى يتمدد المحتوى إذا تغير visibleCount
-                const timer = setTimeout(() => {
-                    requestAnimationFrame(() => {
-                        window.scrollTo(0, y);
-                    });
-                }, 100);
-                sessionStorage.removeItem('products_scroll');
-                sessionStorage.removeItem('products_visibleCount');
-                return () => clearTimeout(timer);
+                // انتظر حتى يتم عرض العناصر بعد تغيير الصفحة (إذا لزم)
+                setTimeout(() => {
+                    window.scrollTo(0, y);
+                }, 50);
             }
+            sessionStorage.removeItem('products_scroll');
         }
-    }, [loading, visibleCount]);
+    }, [loading, currentPage]);
 
     const filtered = useMemo(() => {
         return allProducts.filter(p => {
@@ -108,37 +101,30 @@ export default function ProductsClient() {
         });
     }, [allProducts, search, selectedCategory]);
 
-    // Intersection Observer للتحميل اللانهائي
-    useEffect(() => {
-        const currentLoader = loaderRef.current;
-        if (!currentLoader) return;
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && !loadingMore && visibleCount < filtered.length) {
-                    setLoadingMore(true);
-                    setTimeout(() => {
-                        setVisibleCount(prev => prev + ITEMS_PER_LOAD);
-                        setLoadingMore(false);
-                    }, 300);
-                }
-            },
-            { threshold: 0.1 }
-        );
-        observer.observe(currentLoader);
-        return () => observer.disconnect();
-    }, [loadingMore, visibleCount, filtered.length]);
-
-    const visibleProducts = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
-    const hasMore = visibleCount < filtered.length;
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filtered.slice(start, start + ITEMS_PER_PAGE);
+    }, [filtered, currentPage]);
 
     const discountedPrice = (p: Product) =>
         p.discount ? p.price - (p.price * p.discount) / 100 : p.price;
 
-    // معالج تغيير التصنيف من القائمة المنسدلة
+    // معالجات يدوية تضبط الصفحة للأولى عند تغيير المدخلات
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearch(e.target.value);
+        setCurrentPage(1);
+        window.scrollTo(0, 0);
+    };
+
     const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const value = e.target.value;
-        setSelectedCategory(value);
-        setVisibleCount(ITEMS_PER_LOAD);
+        setSelectedCategory(e.target.value);
+        setCurrentPage(1);
+        window.scrollTo(0, 0);
+    };
+
+    const goToPage = (page: number) => {
+        setCurrentPage(page);
         window.scrollTo(0, 0);
     };
 
@@ -186,11 +172,7 @@ export default function ProductsClient() {
                         type="text"
                         placeholder="ابحث عن منتج..."
                         value={search}
-                        onChange={e => {
-                            setSearch(e.target.value);
-                            setVisibleCount(ITEMS_PER_LOAD);
-                            window.scrollTo(0, 0);
-                        }}
+                        onChange={handleSearchChange}
                         className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
                     />
                     <select
@@ -206,28 +188,40 @@ export default function ProductsClient() {
                 </div>
 
                 {/* Product Grid */}
-                {visibleProducts.length === 0 ? (
+                {paginated.length === 0 ? (
                     <div className="text-center py-20 text-gray-400">
                         <p className="text-lg">لا توجد منتجات مطابقة</p>
                     </div>
                 ) : (
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                            {visibleProducts.map(product => (
+                            {paginated.map(product => (
                                 <ProductCard key={product.id} product={product} />
                             ))}
                         </div>
-                        <div ref={loaderRef} className="py-10 text-center">
-                            {loadingMore && (
-                                <div className="flex items-center justify-center gap-2 text-gray-500">
-                                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                    <span>جاري تحميل المزيد...</span>
-                                </div>
-                            )}
-                            {!hasMore && filtered.length > ITEMS_PER_LOAD && (
-                                <p className="text-gray-400 text-sm">تم عرض جميع المنتجات ✓</p>
-                            )}
-                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex justify-center items-center gap-3 mt-8">
+                                <button
+                                    onClick={() => goToPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                    السابق
+                                </button>
+                                <span className="text-gray-700">
+                                    {currentPage} / {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => goToPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                    التالي
+                                </button>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
