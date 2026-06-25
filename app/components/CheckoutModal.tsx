@@ -149,16 +149,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
             return;
         }
 
-        const orderSuccess = await saveOrder({
-            name: fullName,
-            phone,
-            governorate,
-            city,
-            street,
-            whatsapp,
-            paymentMethod,
-            notes,
-        });
+        const orderSuccess = await saveOrder();
 
         if (orderSuccess) {
             const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '962798072373';
