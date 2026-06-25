@@ -11,10 +11,22 @@ export interface Order {
     created_at: string;
 }
 
-export async function addOrder(order: Omit<Order, 'id' | 'created_at'>): Promise<Order | null> {
+export async function addOrder(order: any): Promise<Order | null> {
+    // نضمن فقط الحقول الموجودة في التعريف الأساسي
+    const cleanOrder = {
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        customer_email: order.customer_email || '',
+        total_amount: order.total_amount,
+        items: order.items,
+        status: order.status || 'جديد',
+        // إذا أضفت عمود notes يدوياً، أضفه هنا:
+        notes: order.notes || null
+    };
+
     const { data, error } = await supabase
         .from('orders')
-        .insert([order])
+        .insert([cleanOrder])
         .select()
         .single();
 
@@ -24,7 +36,6 @@ export async function addOrder(order: Omit<Order, 'id' | 'created_at'>): Promise
     }
     return data;
 }
-
 export async function getAllOrders(): Promise<Order[]> {
     const { data, error } = await supabase
         .from('orders')

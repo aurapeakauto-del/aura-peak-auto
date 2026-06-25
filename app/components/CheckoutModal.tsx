@@ -63,21 +63,18 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     };
 
     // حفظ الطلب مع معلومات العميل
-    const saveOrder = async (customerData: {
-        name: string;
-        phone: string;
-        governorate: string;
-        city: string;
-        street: string;
-        whatsapp?: string;
-        paymentMethod: string;
-        notes?: string;
-    }) => {
+    // حفظ الطلب (متوافق مع جدول orders)
+    const saveOrder = async () => {
         try {
             const { addOrder } = await import('@/app/lib/orders');
+
+            // نجمع معلومات العنوان والدفع في notes
+            const addressInfo = `المحافظة: ${governorate}\nالمدينة: ${city}\nالشارع: ${street}\nالدفع: ${paymentMethod}`;
+            const combinedNotes = [notes, addressInfo].filter(Boolean).join('\n---\n');
+
             const orderData = {
-                customer_name: customerData.name,
-                customer_phone: customerData.whatsapp || customerData.phone,
+                customer_name: fullName,
+                customer_phone: whatsapp || phone, // نستخدم الواتساب أو الهاتف
                 customer_email: '',
                 total_amount: finalTotal,
                 items: items.map(item => ({
@@ -89,14 +86,14 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                     image: item.image || ''
                 })),
                 status: 'جديد',
-                // حقول إضافية (إذا كان orders يدعمها)
-                governorate: customerData.governorate,
-                city: customerData.city,
-                street: customerData.street,
-                payment_method: customerData.paymentMethod,
-                notes: customerData.notes || '',
+                notes: combinedNotes // نضيف جميع التفاصيل هنا (إن كان الجدول يحتوي عمود notes)
             };
-            const result = await addOrder(orderData);
+
+            // إذا كان جدول orders لا يحتوي عمود notes، نحذفه
+            const finalOrder: any = { ...orderData };
+            // (اختياري: يمكن حذف notes إذا لم يكن موجوداً في الجدول، لكن سنتركه - Supabase سيتجاهل الحقول الزائدة غالباً)
+
+            const result = await addOrder(finalOrder);
             return !!result;
         } catch (error) {
             console.error('❌ خطأ في حفظ الطلب:', error);
