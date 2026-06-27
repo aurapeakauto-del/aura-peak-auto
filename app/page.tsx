@@ -141,15 +141,15 @@ export default function HomePage() {
                         {/* شريط إحصائيات سريع */}
                         <div className="grid grid-cols-3 gap-8 md:gap-16 mt-16 md:mt-20">
                             <div className="text-center">
-                                <p className="text-3xl md:text-4xl font-light text-[#1a1a1a]">+350</p>
+                                <p className="text-3xl md:text-4xl font-light text-[#1a1a1a]">+150</p>
                                 <p className="text-gray-500 text-sm mt-1">منتج مميز</p>
                             </div>
                             <div className="text-center">
-                                <p className="text-3xl md:text-4xl font-light text-[#1a1a1a]">+800</p>
+                                <p className="text-3xl md:text-4xl font-light text-[#1a1a1a]">+400</p>
                                 <p className="text-gray-500 text-sm mt-1">عميل سعيد</p>
                             </div>
                             <div className="text-center">
-                                <p className="text-3xl md:text-4xl font-light text-[#1a1a1a]">+40</p>
+                                <p className="text-3xl md:text-4xl font-light text-[#1a1a1a]">+20</p>
                                 <p className="text-gray-500 text-sm mt-1">ماركة عالمية</p>
                             </div>
                         </div>
