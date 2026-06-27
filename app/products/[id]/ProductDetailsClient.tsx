@@ -8,7 +8,7 @@ import { getProductById, getRelatedProducts, Product, VehicleFitment } from '@/a
 import Ratings from '@/app/components/Ratings';
 import { useToast } from '@/app/components/Toast';
 import VehicleFitmentSelector from './VehicleFitmentSelector';
-import { FaArrowRight, FaFacebook, FaWhatsapp, FaTwitter, FaCopy, FaTruck, FaStar, FaCheckCircle, FaImage, FaCartPlus, FaMinus, FaPlus } from 'react-icons/fa';
+import { FaArrowRight, FaFacebook, FaWhatsapp, FaTwitter, FaCopy, FaTruck, FaStar, FaCheckCircle, FaImage, FaCartPlus, FaMinus, FaPlus, FaTimes, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
 
 interface Props {
     id: number;
@@ -45,6 +45,7 @@ export default function ProductDetailsClient({ id }: Props) {
     const [quantity, setQuantity] = useState(1);
     const [showFullDescription, setShowFullDescription] = useState(false);
     const [selectedVariants, setSelectedVariants] = useState<Record<string, SelectedVariant>>({});
+    const [lightboxOpen, setLightboxOpen] = useState(false);
 
     useEffect(() => {
         loadProduct();
@@ -128,6 +129,27 @@ export default function ProductDetailsClient({ id }: Props) {
         else window.open(shareUrls[platform] as string, '_blank');
     };
 
+    const openLightbox = (index: number) => {
+        setSelectedImage(index);
+        setLightboxOpen(true);
+    };
+
+    const closeLightbox = () => {
+        setLightboxOpen(false);
+    };
+
+    const nextImage = () => {
+        if (product?.images && product.images.length > 0) {
+            setSelectedImage(prev => (prev + 1) % product.images.length);
+        }
+    };
+
+    const prevImage = () => {
+        if (product?.images && product.images.length > 0) {
+            setSelectedImage(prev => (prev - 1 + product.images.length) % product.images.length);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-[#faf7f2] flex items-center justify-center">
@@ -163,8 +185,12 @@ export default function ProductDetailsClient({ id }: Props) {
                 </button>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    {/* قسم الصور مع Lightbox */}
                     <div>
-                        <div className="bg-white aspect-square flex items-center justify-center mb-4 border border-gray-200 shadow-sm overflow-hidden">
+                        <div
+                            className="bg-white aspect-square flex items-center justify-center mb-4 border border-gray-200 shadow-sm overflow-hidden cursor-pointer"
+                            onClick={() => openLightbox(selectedImage)}
+                        >
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                                 {product.images && product.images.length > 0 ? (
                                     <img src={product.images[selectedImage] || product.image} alt={product.name} className="w-full h-full object-contain" />
@@ -178,13 +204,32 @@ export default function ProductDetailsClient({ id }: Props) {
                         {product.images && product.images.length > 1 && (
                             <div className="flex gap-2 overflow-x-auto pb-2 mt-2">
                                 {product.images.map((img, index) => (
-                                    <button key={index} onClick={() => setSelectedImage(index)} className={`w-16 h-16 bg-white border-2 flex-shrink-0 overflow-hidden ${selectedImage === index ? 'border-[#2c2c2c]' : 'border-gray-200 hover:border-gray-400'}`}>
+                                    <button key={index} onClick={() => { setSelectedImage(index); openLightbox(index); }} className={`w-16 h-16 bg-white border-2 flex-shrink-0 overflow-hidden ${selectedImage === index ? 'border-[#2c2c2c]' : 'border-gray-200 hover:border-gray-400'}`}>
                                         <img src={img} alt={`${product.name} - ${index + 1}`} className="w-full h-full object-cover" />
                                     </button>
                                 ))}
                             </div>
                         )}
                     </div>
+
+                    {/* Lightbox Modal */}
+                    {lightboxOpen && product.images && product.images.length > 0 && (
+                        <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center" onClick={closeLightbox}>
+                            <button className="absolute top-4 right-4 text-white hover:text-gray-300 z-10" onClick={closeLightbox}><FaTimes size={24} /></button>
+                            {product.images.length > 1 && (
+                                <>
+                                    <button className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 z-10" onClick={(e) => { e.stopPropagation(); prevImage(); }}><FaChevronLeft size={32} /></button>
+                                    <button className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 z-10" onClick={(e) => { e.stopPropagation(); nextImage(); }}><FaChevronRight size={32} /></button>
+                                </>
+                            )}
+                            <img
+                                src={product.images[selectedImage]}
+                                alt={product.name}
+                                className="max-w-full max-h-full object-contain p-4"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+                    )}
 
                     <div>
                         <div className="flex flex-wrap gap-2 mb-4">
@@ -223,33 +268,57 @@ export default function ProductDetailsClient({ id }: Props) {
                             {product.recommended && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded flex items-center gap-1"><FaCheckCircle /> موصى به</span>}
                         </div>
 
-                        {/* المتغيرات */}
+                        {/* المتغيرات - تصميم محسّن */}
                         {product.variants && product.variants.length > 0 ? (
                             <div className="mb-8 space-y-6">
                                 {product.variants.map((variant) => (
                                     <div key={variant.id} className="p-4 bg-white border border-gray-200 rounded-lg">
-                                        <h3 className="text-[#2c2c2c] text-sm font-medium mb-3">{variant.name}</h3>
-                                        <div className="space-y-3">
+                                        <h3 className="text-[#2c2c2c] text-sm font-medium mb-3 flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                            {variant.name}
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {variant.options.map((option) => {
                                                 const variantKey = `${variant.name}-${option.name}`;
                                                 const selected = selectedVariants[variantKey];
                                                 const qty = selected?.quantity || 0;
                                                 const finalPrice = baseDiscountedPrice + option.extraPrice;
+                                                const isSelected = qty > 0;
                                                 return (
-                                                    <div key={option.name} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0 flex-wrap sm:flex-nowrap gap-2">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="text-[#2c2c2c] text-sm">{option.name}</span>
+                                                    <div
+                                                        key={option.name}
+                                                        className={`p-3 border rounded-lg transition-all ${isSelected
+                                                                ? 'border-amber-500 bg-amber-50'
+                                                                : 'border-gray-200 bg-white hover:border-gray-400'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-[#2c2c2c] text-sm font-medium">{option.name}</span>
                                                             {option.extraPrice !== 0 && (
                                                                 <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${option.extraPrice > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                                                                     {option.extraPrice > 0 ? `+ JD ${option.extraPrice}` : `- JD ${Math.abs(option.extraPrice)}`}
                                                                 </span>
                                                             )}
-                                                            <span className="text-gray-400 text-xs">(متوفر: {option.stock})</span>
                                                         </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <button onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, -1, option.stock)} className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded disabled:opacity-50" disabled={qty === 0}><FaMinus size={12} /></button>
-                                                            <span className="text-[#2c2c2c] w-8 text-center font-medium">{qty}</span>
-                                                            <button onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, 1, option.stock)} className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded" disabled={qty >= option.stock}><FaPlus size={12} /></button>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-gray-400 text-xs">متوفر: {option.stock}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, -1, option.stock)}
+                                                                    className="w-7 h-7 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded disabled:opacity-50"
+                                                                    disabled={qty === 0}
+                                                                >
+                                                                    <FaMinus size={10} />
+                                                                </button>
+                                                                <span className="text-[#2c2c2c] w-6 text-center text-sm font-medium">{qty}</span>
+                                                                <button
+                                                                    onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, 1, option.stock)}
+                                                                    className="w-7 h-7 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
+                                                                    disabled={qty >= option.stock}
+                                                                >
+                                                                    <FaPlus size={10} />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );
