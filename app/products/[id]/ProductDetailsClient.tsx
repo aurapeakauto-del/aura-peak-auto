@@ -8,11 +8,12 @@ import { getProductById, getRelatedProducts, Product, VehicleFitment } from '@/a
 import Ratings from '@/app/components/Ratings';
 import { useToast } from '@/app/components/Toast';
 import VehicleFitmentSelector from './VehicleFitmentSelector';
+import { FaArrowRight, FaFacebook, FaWhatsapp, FaTwitter, FaCopy, FaTruck, FaStar, FaCheckCircle, FaImage, FaCartPlus, FaMinus, FaPlus } from 'react-icons/fa';
+
 interface Props {
     id: number;
 }
 
-// تعريف نوع لعنصر المتغير مع السعر الإضافي
 interface SelectedVariant {
     variant: string;
     quantity: number;
@@ -43,8 +44,6 @@ export default function ProductDetailsClient({ id }: Props) {
     const [selectedImage, setSelectedImage] = useState(0);
     const [quantity, setQuantity] = useState(1);
     const [showFullDescription, setShowFullDescription] = useState(false);
-
-    // ✅ تخزين الخيارات المختارة مع الكميات والأسعار الإضافية
     const [selectedVariants, setSelectedVariants] = useState<Record<string, SelectedVariant>>({});
 
     useEffect(() => {
@@ -56,12 +55,10 @@ export default function ProductDetailsClient({ id }: Props) {
         setLoading(true);
         const data = await getProductById(id);
         setProduct(data);
-
         if (data) {
             const related = await getRelatedProducts(id);
             setRelatedProducts(related);
         }
-
         setLoading(false);
     };
 
@@ -74,9 +71,7 @@ export default function ProductDetailsClient({ id }: Props) {
     };
 
     const decreaseQuantity = () => {
-        if (quantity > 1) {
-            setQuantity(prev => prev - 1);
-        }
+        if (quantity > 1) setQuantity(prev => prev - 1);
     };
 
     const [selectedFitment, setSelectedFitment] = useState<{
@@ -85,106 +80,52 @@ export default function ProductDetailsClient({ id }: Props) {
         finalPrice: number;
     } | null>(null);
 
-    // ✅ حساب السعر النهائي مع الخصم والسعر الإضافي
     const getDiscountedPrice = (price: number) => {
-        if (product?.discount) {
-            return price - (price * product.discount / 100);
-        }
+        if (product?.discount) return price - (price * product.discount / 100);
         return price;
     };
 
     const baseDiscountedPrice = product ? getDiscountedPrice(product.price) : 0;
 
-    // ✅ إضافة منتج بمتغيرات متعددة إلى السلة
     const handleAddToCart = () => {
         if (!product) return;
-
-        // ✅ 1. منتج بدون متغيرات ولا توافقات
-        if ((!product.variants || product.variants.length === 0) &&
-            (!product.vehicleFitments || product.vehicleFitments.length === 0)) {
+        if ((!product.variants || product.variants.length === 0) && (!product.vehicleFitments || product.vehicleFitments.length === 0)) {
             addMultipleToCart(product, [{ variant: '', quantity }]);
             showToast(`تمت إضافة ${quantity} قطع إلى السلة`, 'success');
             return;
         }
-
-        // ✅ 2. منتج بمتغيرات (ألوان، مقاسات)
-        const variantsList = Object.values(selectedVariants)
-            .filter(v => v.quantity > 0)
-            .map(({ variant, quantity, extraPrice }) => ({
-                variant,
-                quantity,
-                extraPrice
-            }));
-
-        // ✅ 3. منتج بتوافق مركبات (جديد)
-        const fitmentList = selectedFitment && selectedFitment.quantity > 0 ? [{
-            variant: `${selectedFitment.fitment.make} ${selectedFitment.fitment.model} (${selectedFitment.fitment.year})`,
-            quantity: selectedFitment.quantity,
-            extraPrice: selectedFitment.fitment.extraPrice
-        }] : [];
-
-        // ✅ دمج القائمتين
+        const variantsList = Object.values(selectedVariants).filter(v => v.quantity > 0).map(({ variant, quantity, extraPrice }) => ({ variant, quantity, extraPrice }));
+        const fitmentList = selectedFitment && selectedFitment.quantity > 0 ? [{ variant: `${selectedFitment.fitment.make} ${selectedFitment.fitment.model} (${selectedFitment.fitment.year})`, quantity: selectedFitment.quantity, extraPrice: selectedFitment.fitment.extraPrice }] : [];
         const allItems = [...variantsList, ...fitmentList];
-
-        if (allItems.length === 0) {
-            showToast('الرجاء اختيار كمية واحدة على الأقل', 'warning');
-            return;
-        }
-
+        if (allItems.length === 0) { showToast('الرجاء اختيار كمية واحدة على الأقل', 'warning'); return; }
         addMultipleToCart(product, allItems);
         setSelectedVariants({});
-        setSelectedFitment(null); // ✅ إعادة تعيين اختيار السيارة
+        setSelectedFitment(null);
         showToast('تمت إضافة المنتجات إلى السلة', 'success');
     };
 
-    // ✅ تحديث كمية خيار معين
     const updateVariantQuantity = (variantKey: string, optionName: string, extraPrice: number, delta: number, maxStock: number) => {
         setSelectedVariants(prev => {
             const current = prev[variantKey];
             const newQuantity = (current?.quantity || 0) + delta;
-
-            if (newQuantity <= 0) {
-                const { [variantKey]: _, ...rest } = prev;
-                return rest;
-            }
-
-            if (newQuantity <= maxStock) {
-                return {
-                    ...prev,
-                    [variantKey]: {
-                        variant: optionName,
-                        quantity: newQuantity,
-                        extraPrice
-                    }
-                };
-            } else {
-                showToast(`الكمية المتوفرة هي ${maxStock} قطع`, 'warning');
-                return prev;
-            }
+            if (newQuantity <= 0) { const { [variantKey]: _, ...rest } = prev; return rest; }
+            if (newQuantity <= maxStock) return { ...prev, [variantKey]: { variant: optionName, quantity: newQuantity, extraPrice } };
+            showToast(`الكمية المتوفرة هي ${maxStock} قطع`, 'warning');
+            return prev;
         });
     };
 
     const shareProduct = (platform: string) => {
         const url = window.location.href;
         const text = `تعرّف على ${product?.name} من Aura Peak Auto`;
-
         const shareUrls: Record<string, string | (() => void)> = {
             whatsapp: `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`,
             facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
             twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-            telegram: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
-            email: `mailto:?subject=${encodeURIComponent(product?.name || '')}&body=${encodeURIComponent(text + '\n\n' + url)}`,
-            copy: () => {
-                navigator.clipboard.writeText(url);
-                showToast('تم نسخ الرابط', 'success');
-            }
+            copy: () => { navigator.clipboard.writeText(url); showToast('تم نسخ الرابط', 'success'); }
         };
-
-        if (platform === 'copy') {
-            (shareUrls.copy as () => void)();
-        } else {
-            window.open(shareUrls[platform] as string, '_blank');
-        }
+        if (platform === 'copy') (shareUrls.copy as () => void)();
+        else window.open(shareUrls[platform] as string, '_blank');
     };
 
     if (loading) {
@@ -203,12 +144,7 @@ export default function ProductDetailsClient({ id }: Props) {
             <div className="min-h-screen bg-[#faf7f2] flex items-center justify-center">
                 <div className="text-center">
                     <h1 className="text-2xl text-[#2c2c2c] mb-4">المنتج غير موجود</h1>
-                    <Link
-                        href="/products"
-                        className="px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors"
-                    >
-                        العودة للمنتجات
-                    </Link>
+                    <Link href="/products" className="px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors">العودة للمنتجات</Link>
                 </div>
             </div>
         );
@@ -217,144 +153,77 @@ export default function ProductDetailsClient({ id }: Props) {
     const descriptionLines = product.description.split('\n');
     const shortDescription = descriptionLines.slice(0, 3).join('\n');
     const hasMoreLines = descriptionLines.length > 3;
-
-    // حساب السعر المعروض (قد يتغير حسب المتغيرات)
     const displayPrice = baseDiscountedPrice;
 
     return (
         <div className="min-h-screen bg-[#faf7f2]">
             <div className="container mx-auto px-4 py-12">
                 <button onClick={() => window.history.back()} className="flex items-center gap-2 text-gray-500 hover:text-[#2c2c2c] mb-8 transition-colors">
-                    <span>→</span> رجوع
+                    <FaArrowRight /> رجوع
                 </button>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    {/* قسم الصور */}
                     <div>
                         <div className="bg-white aspect-square flex items-center justify-center mb-4 border border-gray-200 shadow-sm overflow-hidden">
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                                 {product.images && product.images.length > 0 ? (
-                                    <img
-                                        src={product.images[selectedImage] || product.image}
-                                        alt={product.name}
-                                        className="w-full h-full object-contain"
-                                    />
+                                    <img src={product.images[selectedImage] || product.image} alt={product.name} className="w-full h-full object-contain" />
                                 ) : product.image ? (
-                                    <img
-                                        src={product.image}
-                                        alt={product.name}
-                                        className="w-full h-full object-contain"
-                                    />
+                                    <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
                                 ) : (
-                                    <span className="text-6xl">📷</span>
+                                    <FaImage size={64} className="text-gray-300" />
                                 )}
                             </div>
                         </div>
-
                         {product.images && product.images.length > 1 && (
                             <div className="flex gap-2 overflow-x-auto pb-2 mt-2">
                                 {product.images.map((img, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => setSelectedImage(index)}
-                                        className={`
-                                            w-16 h-16 bg-white border-2 flex-shrink-0 overflow-hidden
-                                            ${selectedImage === index
-                                                ? 'border-[#2c2c2c]'
-                                                : 'border-gray-200 hover:border-gray-400'
-                                            }
-                                        `}
-                                    >
-                                        <img
-                                            src={img}
-                                            alt={`${product.name} - ${index + 1}`}
-                                            className="w-full h-full object-cover"
-                                        />
+                                    <button key={index} onClick={() => setSelectedImage(index)} className={`w-16 h-16 bg-white border-2 flex-shrink-0 overflow-hidden ${selectedImage === index ? 'border-[#2c2c2c]' : 'border-gray-200 hover:border-gray-400'}`}>
+                                        <img src={img} alt={`${product.name} - ${index + 1}`} className="w-full h-full object-cover" />
                                     </button>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* تفاصيل المنتج */}
                     <div>
-                        {/* التصنيفات */}
                         <div className="flex flex-wrap gap-2 mb-4">
                             {product.categories?.map((cat) => (
-                                <Link
-                                    key={cat}
-                                    href={`/products?category=${encodeURIComponent(cat)}`}
-                                    className="text-xs bg-gray-200 text-[#2c2c2c] px-3 py-1 hover:bg-gray-300 transition-colors rounded"
-                                >
-                                    {cat}
-                                </Link>
+                                <Link key={cat} href={`/products?category=${encodeURIComponent(cat)}`} className="text-xs bg-gray-200 text-[#2c2c2c] px-3 py-1 hover:bg-gray-300 transition-colors rounded">{cat}</Link>
                             ))}
                         </div>
 
-                        <h1 className="text-3xl md:text-4xl font-light text-[#2c2c2c] mt-2 mb-4">
-                            {product.name}
-                        </h1>
+                        <h1 className="text-3xl md:text-4xl font-light text-[#2c2c2c] mt-2 mb-4">{product.name}</h1>
 
-                        {/* السعر */}
                         <div className="mb-6">
                             {product.discount ? (
                                 <div className="flex items-baseline gap-3">
-                                    <span className="text-3xl text-[#2c2c2c] font-semibold">
-                                        JD {displayPrice.toFixed(2)}
-                                    </span>
-                                    <span className="text-lg text-gray-500 line-through">
-                                        JD {product.price.toFixed(2)}
-                                    </span>
-                                    <span className="bg-red-100 text-red-800 px-3 py-1 text-sm rounded">
-                                        وفر {product.discount}%
-                                    </span>
+                                    <span className="text-3xl text-[#2c2c2c] font-semibold">JD {displayPrice.toFixed(2)}</span>
+                                    <span className="text-lg text-gray-500 line-through">JD {product.price.toFixed(2)}</span>
+                                    <span className="bg-red-100 text-red-800 px-3 py-1 text-sm rounded">وفر {product.discount}%</span>
                                 </div>
                             ) : (
-                                <span className="text-3xl text-[#2c2c2c] font-semibold">
-                                    JD {displayPrice.toFixed(2)}
-                                </span>
+                                <span className="text-3xl text-[#2c2c2c] font-semibold">JD {displayPrice.toFixed(2)}</span>
                             )}
                         </div>
 
                         {/* أزرار المشاركة */}
                         <div className="flex items-center gap-3 mb-6">
                             <span className="text-gray-500 text-sm">مشاركة:</span>
-                            <button onClick={() => shareProduct('facebook')} className="w-9 h-9 bg-[#1877f2] text-white rounded-full hover:opacity-90 transition-opacity flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => shareProduct('instagram')} className="w-9 h-9 bg-[#e4405f] text-white rounded-full hover:opacity-90 transition-opacity flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM5.838 12a6.162 6.162 0 1 1 12.324 0 6.162 6.162 0 0 1-12.324 0zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm4.965-10.405a1.44 1.44 0 1 1 2.881.001 1.44 1.44 0 0 1-2.881-.001z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => shareProduct('whatsapp')} className="w-9 h-9 bg-[#25d366] text-white rounded-full hover:opacity-90 transition-opacity flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.125.554 4.122 1.523 5.86L.053 23.353c-.097.377.213.736.597.64l5.493-1.463C7.878 22.446 9.874 23 12 23c6.627 0 12-5.373 12-12S18.627 0 12 0z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => shareProduct('twitter')} className="w-9 h-9 bg-black text-white rounded-full hover:bg-gray-800 transition-colors flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => shareProduct('copy')} className="w-9 h-9 bg-gray-600 text-white rounded-full hover:bg-gray-700 transition-colors flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            </button>
+                            <button onClick={() => shareProduct('facebook')} className="w-9 h-9 bg-[#1877f2] text-white rounded-full hover:opacity-90 transition-opacity flex items-center justify-center"><FaFacebook size={16} /></button>
+                            <button onClick={() => shareProduct('whatsapp')} className="w-9 h-9 bg-[#25d366] text-white rounded-full hover:opacity-90 transition-opacity flex items-center justify-center"><FaWhatsapp size={18} /></button>
+                            <button onClick={() => shareProduct('twitter')} className="w-9 h-9 bg-black text-white rounded-full hover:bg-gray-800 transition-colors flex items-center justify-center"><FaTwitter size={16} /></button>
+                            <button onClick={() => shareProduct('copy')} className="w-9 h-9 bg-gray-600 text-white rounded-full hover:bg-gray-700 transition-colors flex items-center justify-center"><FaCopy size={14} /></button>
                         </div>
 
                         {/* الشارات */}
                         <div className="flex flex-wrap gap-3 mb-6">
-                            {product.freeShipping && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded">🚚 توصيل مجاني</span>}
-                            {product.featured && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded">⭐ الأكثر طلباً</span>}
-                            {product.recommended && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded">✅ موصى به</span>}
+                            {product.freeShipping && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded flex items-center gap-1"><FaTruck /> توصيل مجاني</span>}
+                            {product.featured && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded flex items-center gap-1"><FaStar /> الأكثر طلباً</span>}
+                            {product.recommended && <span className="bg-gray-200 text-[#2c2c2c] px-4 py-2 text-sm rounded flex items-center gap-1"><FaCheckCircle /> موصى به</span>}
                         </div>
 
-                        {/* ===== قسم المتغيرات للزبون ===== */}
+                        {/* المتغيرات */}
                         {product.variants && product.variants.length > 0 ? (
                             <div className="mb-8 space-y-6">
                                 {product.variants.map((variant) => (
@@ -366,7 +235,6 @@ export default function ProductDetailsClient({ id }: Props) {
                                                 const selected = selectedVariants[variantKey];
                                                 const qty = selected?.quantity || 0;
                                                 const finalPrice = baseDiscountedPrice + option.extraPrice;
-
                                                 return (
                                                     <div key={option.name} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0 flex-wrap sm:flex-nowrap gap-2">
                                                         <div className="flex flex-wrap items-center gap-2">
@@ -379,23 +247,9 @@ export default function ProductDetailsClient({ id }: Props) {
                                                             <span className="text-gray-400 text-xs">(متوفر: {option.stock})</span>
                                                         </div>
                                                         <div className="flex items-center gap-3">
-                                                            <button
-                                                                onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, -1, option.stock)}
-                                                                className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded disabled:opacity-50"
-                                                                disabled={qty === 0}
-                                                            >
-                                                                −
-                                                            </button>
-                                                            <span className="text-[#2c2c2c] w-8 text-center font-medium">
-                                                                {qty}
-                                                            </span>
-                                                            <button
-                                                                onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, 1, option.stock)}
-                                                                className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
-                                                                disabled={qty >= option.stock}
-                                                            >
-                                                                +
-                                                            </button>
+                                                            <button onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, -1, option.stock)} className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded disabled:opacity-50" disabled={qty === 0}><FaMinus size={12} /></button>
+                                                            <span className="text-[#2c2c2c] w-8 text-center font-medium">{qty}</span>
+                                                            <button onClick={() => updateVariantQuantity(variantKey, option.name, option.extraPrice, 1, option.stock)} className="w-8 h-8 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded" disabled={qty >= option.stock}><FaPlus size={12} /></button>
                                                         </div>
                                                     </div>
                                                 );
@@ -403,106 +257,57 @@ export default function ProductDetailsClient({ id }: Props) {
                                         </div>
                                     </div>
                                 ))}
-
-                                {/* إجمالي الكمية المختارة للمتغيرات */}
                                 {Object.values(selectedVariants).reduce((a, b) => a + b.quantity, 0) > 0 && (
                                     <div className="mt-4 p-4 bg-gray-100 border border-gray-200 rounded-lg">
                                         <div className="flex justify-between items-center flex-wrap gap-2">
                                             <span className="text-[#2c2c2c] font-medium">إجمالي القطع المختارة:</span>
-                                            <span className="text-[#2c2c2c] text-xl font-semibold">
-                                                {Object.values(selectedVariants).reduce((a, b) => a + b.quantity, 0)}
-                                            </span>
+                                            <span className="text-[#2c2c2c] text-xl font-semibold">{Object.values(selectedVariants).reduce((a, b) => a + b.quantity, 0)}</span>
                                         </div>
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            // منتج بدون متغيرات - أزرار كمية بسيطة
                             <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg">
                                 <h3 className="text-[#2c2c2c] text-sm font-medium mb-3">الكمية</h3>
                                 <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={decreaseQuantity}
-                                        className="w-10 h-10 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
-                                    >
-                                        −
-                                    </button>
-                                    <span className="text-[#2c2c2c] w-12 text-center font-medium text-lg">
-                                        {quantity}
-                                    </span>
-                                    <button
-                                        onClick={increaseQuantity}
-                                        className="w-10 h-10 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"
-                                    >
-                                        +
-                                    </button>
-                                    <span className="text-gray-500 text-sm mr-2">
-                                        / {product.stock} متبقي
-                                    </span>
+                                    <button onClick={decreaseQuantity} className="w-10 h-10 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"><FaMinus size={14} /></button>
+                                    <span className="text-[#2c2c2c] w-12 text-center font-medium text-lg">{quantity}</span>
+                                    <button onClick={increaseQuantity} className="w-10 h-10 flex items-center justify-center border border-gray-300 text-[#2c2c2c] bg-white hover:bg-gray-100 transition-colors rounded"><FaPlus size={14} /></button>
+                                    <span className="text-gray-500 text-sm mr-2">/ {product.stock} متبقي</span>
                                 </div>
                             </div>
                         )}
 
-                        {/* المخزون */}
                         <div className="mb-6">
-                            {product.stock === 0 ? (
-                                <p className="text-red-600 text-sm">نفذت الكمية</p>
-                            ) : (
-                                <p className="text-gray-600 text-sm">
-                                    الكمية المتوفرة: {product.stock} قطع
-                                </p>
-                            )}
+                            {product.stock === 0 ? <p className="text-red-600 text-sm">نفذت الكمية</p> : <p className="text-gray-600 text-sm">الكمية المتوفرة: {product.stock} قطع</p>}
                         </div>
 
-                        {/* الوصف مع "أكمل القراءة" */}
                         <div className="mb-8">
                             <h2 className="text-[#2c2c2c] text-lg font-light mb-3">الوصف</h2>
                             <div className="text-gray-600 leading-relaxed">
                                 {!showFullDescription ? (
                                     <>
                                         <p className="whitespace-pre-line">{shortDescription}</p>
-                                        {hasMoreLines && (
-                                            <button
-                                                onClick={() => setShowFullDescription(true)}
-                                                className="text-amber-600 hover:text-amber-700 text-sm mt-2 font-medium"
-                                            >
-                                                ... أكمل القراءة
-                                            </button>
-                                        )}
+                                        {hasMoreLines && <button onClick={() => setShowFullDescription(true)} className="text-amber-600 hover:text-amber-700 text-sm mt-2 font-medium">... أكمل القراءة</button>}
                                     </>
                                 ) : (
                                     <>
                                         <p className="whitespace-pre-line">{product.description}</p>
-                                        <button
-                                            onClick={() => setShowFullDescription(false)}
-                                            className="text-amber-600 hover:text-amber-700 text-sm mt-2 font-medium"
-                                        >
-                                            عرض أقل
-                                        </button>
+                                        <button onClick={() => setShowFullDescription(false)} className="text-amber-600 hover:text-amber-700 text-sm mt-2 font-medium">عرض أقل</button>
                                     </>
                                 )}
                             </div>
                         </div>
 
                         {product.vehicleFitments && product.vehicleFitments.length > 0 && (
-                            <VehicleFitmentSelector
-                                fitments={product.vehicleFitments}
-                                basePrice={product.price}
-                                discount={product.discount}
-                                onSelect={setSelectedFitment}
-                            />
+                            <VehicleFitmentSelector fitments={product.vehicleFitments} basePrice={product.price} discount={product.discount} onSelect={setSelectedFitment} />
                         )}
 
-                        {/* زر الإضافة */}
                         {product.stock === 0 ? (
-                            <button disabled className="w-full lg:w-auto px-12 py-4 bg-gray-200 text-gray-500 border border-gray-200 cursor-not-allowed text-lg font-light tracking-wider rounded">
-                                غير متوفر مؤقتاً
-                            </button>
+                            <button disabled className="w-full lg:w-auto px-12 py-4 bg-gray-200 text-gray-500 border border-gray-200 cursor-not-allowed text-lg font-light tracking-wider rounded">غير متوفر مؤقتاً</button>
                         ) : (
-                            <button
-                                onClick={handleAddToCart}
-                                className="w-full lg:w-auto px-12 py-4 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-lg font-light tracking-wider rounded"
-                            >
+                            <button onClick={handleAddToCart} className="w-full lg:w-auto px-12 py-4 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-lg font-light tracking-wider rounded flex items-center justify-center gap-2">
+                                <FaCartPlus size={20} />
                                 {product.variants && product.variants.length > 0 ? 'إضافة المختار إلى السلة' : 'إضافة إلى السلة'}
                             </button>
                         )}
@@ -510,47 +315,23 @@ export default function ProductDetailsClient({ id }: Props) {
                 </div>
             </div>
 
-            {/* المنتجات المقترحة */}
             {relatedProducts.length > 0 && (
                 <div className="container mx-auto px-4 mt-16 pt-8 border-t border-gray-200">
-                    <h2 className="text-2xl font-light text-[#2c2c2c] mb-8">
-                        منتجات قد تعجبك
-                    </h2>
+                    <h2 className="text-2xl font-light text-[#2c2c2c] mb-8">منتجات قد تعجبك</h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {relatedProducts
-                            .filter(p => p.stock > 0)
-                            .map((relatedProduct) => (
-                                <Link
-                                    key={relatedProduct.id}
-                                    href={`/products/${relatedProduct.id}`}
-                                    className="group block bg-white border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all p-3 rounded-lg"
-                                >
-                                    <div className="bg-gray-50 aspect-square mb-3 flex items-center justify-center">
-                                        {relatedProduct.image ? (
-                                            <img
-                                                src={relatedProduct.image}
-                                                alt={relatedProduct.name}
-                                                className="w-full h-full object-contain"
-                                            />
-                                        ) : (
-                                            <span className="text-3xl">📷</span>
-                                        )}
-                                    </div>
-                                    <h3 className="text-[#2c2c2c] text-sm font-medium truncate">
-                                        {relatedProduct.name}
-                                    </h3>
-                                    <p className="text-[#2c2c2c] text-sm font-semibold mt-1">
-                                        JD {(relatedProduct.discount
-                                            ? relatedProduct.price - (relatedProduct.price * (relatedProduct.discount || 0) / 100)
-                                            : relatedProduct.price).toFixed(2)}
-                                    </p>
-                                </Link>
-                            ))}
+                        {relatedProducts.filter(p => p.stock > 0).map((relatedProduct) => (
+                            <Link key={relatedProduct.id} href={`/products/${relatedProduct.id}`} className="group block bg-white border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all p-3 rounded-lg">
+                                <div className="bg-gray-50 aspect-square mb-3 flex items-center justify-center">
+                                    {relatedProduct.image ? <img src={relatedProduct.image} alt={relatedProduct.name} className="w-full h-full object-contain" /> : <FaImage size={32} className="text-gray-300" />}
+                                </div>
+                                <h3 className="text-[#2c2c2c] text-sm font-medium truncate">{relatedProduct.name}</h3>
+                                <p className="text-[#2c2c2c] text-sm font-semibold mt-1">JD {(relatedProduct.discount ? relatedProduct.price - (relatedProduct.price * (relatedProduct.discount || 0) / 100) : relatedProduct.price).toFixed(2)}</p>
+                            </Link>
+                        ))}
                     </div>
                 </div>
             )}
 
-            {/* قسم التقييمات */}
             <div className="container mx-auto px-4 mt-16 pt-8 border-t border-gray-200">
                 <Ratings productId={product.id} />
             </div>
