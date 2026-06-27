@@ -4,6 +4,7 @@ import { useCart } from '@/app/context/CartContext';
 import { useState, useEffect } from 'react';
 import { updateProduct } from '@/app/lib/products';
 import { useToast } from './Toast';
+import { FaTimes, FaBox, FaTruck, FaMoneyBillWave, FaCheck } from 'react-icons/fa';
 
 interface CheckoutModalProps {
     onClose: () => void;
@@ -27,7 +28,6 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     const { showToast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // ✅ استعادة بيانات العميل من localStorage
     const [fullName, setFullName] = useState('');
     const [governorate, setGovernorate] = useState('');
     const [city, setCity] = useState('');
@@ -38,7 +38,6 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     const [notes, setNotes] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    // ✅ تحميل البيانات المحفوظة عند فتح الـ Modal
     useEffect(() => {
         const saved = localStorage.getItem('checkout_data');
         if (saved) {
@@ -52,13 +51,10 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                 setWhatsapp(data.whatsapp || '');
                 setPaymentMethod(data.paymentMethod || '');
                 setNotes(data.notes || '');
-            } catch (e) {
-                // ignore
-            }
+            } catch (e) { }
         }
     }, []);
 
-    // ✅ حفظ البيانات تلقائياً عند تغير أي حقل
     useEffect(() => {
         const data = { fullName, governorate, city, street, phone, whatsapp, paymentMethod, notes };
         localStorage.setItem('checkout_data', JSON.stringify(data));
@@ -106,9 +102,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                 status: 'جديد'
             };
             const result = await addOrder(orderData);
-            // ✅ نرجع الـ order ID إذا نجح الحفظ
-            if (result) return result.id;
-            return null;
+            return result ? result.id : null;
         } catch (error) {
             console.error('❌ خطأ في حفظ الطلب:', error);
             return null;
@@ -133,12 +127,12 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
             if (notes) message += `📝 *ملاحظات:* ${notes}\n`;
             message += '\n━━━━━━━━━━━━━━━━━━━━\n';
             message += '📦 *المنتجات:*\n';
-            items.forEach((item, i) => {
+            items.forEach((item) => {
                 message += `• ${item.name} (${item.quantity}x) - JD ${(item.price * item.quantity).toFixed(2)}\n`;
             });
             message += '\n';
             message += `📦 *مجموع المنتجات:* JD ${totalPrice.toFixed(2)}\n`;
-            message += `🚚 *التوصيل:* JD ${DELIVERY_PRICE.toFixed(2)}\n`;
+            message += `🚚 *التوصيل:* JD ${DELIVERY_PRICE.toFixed(2)} _(يختلف حسب المحافظة وحجم الطلب)_\n`;
             message += '━━━━━━━━━━━━━━━━━━━━\n';
             message += `💰 *الإجمالي النهائي:* JD ${finalTotal.toFixed(2)}\n`;
             message += `🕐 ${new Date().toLocaleDateString('ar-JO')}`;
@@ -188,7 +182,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
             sendToTelegram(orderId);
             showToast('تم إرسال طلبك بنجاح!', 'success', 5000);
             clearCart();
-            localStorage.removeItem('checkout_data'); // ✅ مسح البيانات بعد الطلب الناجح
+            localStorage.removeItem('checkout_data');
             onClose();
         } else {
             showToast('فشل حفظ الطلب، حاول مرة أخرى', 'error');
@@ -199,9 +193,15 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
         <>
             <div className="fixed inset-0 bg-black/60 z-[100]" onClick={onClose} />
             <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-xl p-6 z-[101] w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-lg" dir="rtl">
+                {/* Header */}
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-[#2c2c2c] text-2xl font-light">إتمام الطلب</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-[#2c2c2c] text-xl" disabled={isProcessing}>✕</button>
+                    <h2 className="text-[#2c2c2c] text-2xl font-light flex items-center gap-2">
+                        <FaBox className="text-[#2c2c2c]" />
+                        إتمام الطلب
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors" disabled={isProcessing}>
+                        <FaTimes size={20} />
+                    </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -251,9 +251,12 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                         <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                     </div>
 
-                    {/* ✅ ملخص الطلب مع التوصيل قبل المجموع */}
+                    {/* ملخص الطلب */}
                     <div className="bg-gray-50 p-4 rounded space-y-2">
-                        <h3 className="font-medium text-[#2c2c2c] text-sm">ملخص الطلب</h3>
+                        <h3 className="font-medium text-[#2c2c2c] text-sm flex items-center gap-2">
+                            <FaBox className="text-gray-500" />
+                            ملخص الطلب
+                        </h3>
                         {items.map((item, i) => (
                             <div key={i} className="flex justify-between text-sm">
                                 <span>{item.name} ({item.quantity})</span>
@@ -265,18 +268,32 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                             <span>JD {totalPrice.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span>🚚 التوصيل <span className="text-xs text-gray-400">(يختلف حسب المحافظة وحجم الطلب)</span></span>
+                            <span className="flex items-center gap-1">
+                                <FaTruck className="text-gray-500" />
+                                التوصيل
+                                <span className="text-xs text-gray-400">(يختلف حسب المحافظة وحجم الطلب)</span>
+                            </span>
                             <span>JD {DELIVERY_PRICE.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between font-bold text-[#2c2c2c] border-t pt-1">
-                            <span>💰 الإجمالي</span>
+                            <span className="flex items-center gap-1">
+                                <FaMoneyBillWave className="text-green-600" />
+                                الإجمالي
+                            </span>
                             <span>JD {finalTotal.toFixed(2)}</span>
                         </div>
                     </div>
 
-                    <p className="text-xs text-gray-500">⚠️ يرجى التأكد من صحة رقم الهاتف والواتساب لتأكيد الطلب.</p>
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                        ⚠️ يرجى التأكد من صحة رقم الهاتف والواتساب لتأكيد الطلب.
+                    </p>
 
-                    <button type="submit" disabled={isProcessing} className="w-full py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded disabled:opacity-50">
+                    <button
+                        type="submit"
+                        disabled={isProcessing}
+                        className="w-full py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        <FaCheck />
                         {isProcessing ? 'جاري المعالجة...' : 'إتمام الطلب'}
                     </button>
                 </form>
