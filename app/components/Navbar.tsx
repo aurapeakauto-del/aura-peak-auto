@@ -4,22 +4,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/app/lib/supabase';
+import { useCart } from '@/app/context/CartContext';
+import { FaShoppingCart, FaSearch, FaBars, FaTimes } from 'react-icons/fa';
 
 export default function Navbar() {
     const pathname = usePathname();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const { totalItems, openCart } = useCart();
 
     // التحقق من جلسة المشرف
     useEffect(() => {
         const checkAdmin = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            setIsAdmin(!!session); // ✅ يتحقق من وجود جلسة نشطة
+            setIsAdmin(!!session);
         };
-        
+
         checkAdmin();
 
-        // استماع لتغييرات الجلسة (تسجيل الدخول/الخروج)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setIsAdmin(!!session);
         });
@@ -31,7 +33,7 @@ export default function Navbar() {
         { href: '/', label: 'الرئيسية' },
         { href: '/products', label: 'المنتجات' },
         { href: '/offers', label: 'العروض' },
-        ...(isAdmin ? [{ href: '/admin', label: 'لوحة التحكم' }] : []), // ✅ يظهر فقط للمشرف المسجل
+        ...(isAdmin ? [{ href: '/admin', label: 'لوحة التحكم' }] : []),
     ];
 
     const isActive = (path: string) => pathname === path;
@@ -40,7 +42,7 @@ export default function Navbar() {
         <nav className="sticky top-0 z-30 bg-black border-b border-gray-800">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16 md:h-20">
-                    {/* Logo - في أقصى اليمين */}
+                    {/* Logo */}
                     <Link
                         href="/"
                         className="text-white text-xl md:text-2xl font-light tracking-wider hover:text-gray-300 transition-colors"
@@ -48,7 +50,7 @@ export default function Navbar() {
                         Aura Peak <span className="text-gray-400">Auto</span>
                     </Link>
 
-                    {/* Desktop Menu - في المنتصف */}
+                    {/* Desktop Menu */}
                     <div className="hidden md:flex items-center gap-6 lg:gap-8">
                         {navLinks.map((link) => (
                             <Link
@@ -67,24 +69,42 @@ export default function Navbar() {
                         ))}
                     </div>
 
-                    {/* زر القائمة للهواتف - في أقصى اليسار */}
-                    <div className="flex items-center gap-2">
+                    {/* Actions: Search + Cart + Mobile Toggle */}
+                    <div className="flex items-center gap-4">
+                        {/* Search Icon */}
+                        <Link
+                            href="/products"
+                            className="text-gray-400 hover:text-white transition-colors hidden md:block"
+                            title="بحث"
+                        >
+                            <FaSearch size={18} />
+                        </Link>
+
+                        {/* Cart Icon */}
+                        <button
+                            onClick={openCart}
+                            className="text-gray-400 hover:text-white transition-colors relative"
+                            title="السلة"
+                        >
+                            <FaShoppingCart size={20} />
+                            {totalItems > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-white text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                    {totalItems}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Mobile Menu Toggle */}
                         <button
                             onClick={() => setIsMenuOpen(!isMenuOpen)}
                             className="md:hidden w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                         >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {isMenuOpen ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                                ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
-                                )}
-                            </svg>
+                            {isMenuOpen ? <FaTimes size={20} /> : <FaBars size={20} />}
                         </button>
                     </div>
                 </div>
 
-                {/* Mobile Menu - القائمة المنسدلة للهواتف */}
+                {/* Mobile Menu */}
                 <div className={`
                     md:hidden overflow-hidden transition-all duration-300 ease-in-out
                     ${isMenuOpen ? 'max-h-96 border-t border-gray-800' : 'max-h-0'}
@@ -106,6 +126,15 @@ export default function Navbar() {
                                 {link.label}
                             </Link>
                         ))}
+                        {/* Mobile Search Link */}
+                        <Link
+                            href="/products"
+                            onClick={() => setIsMenuOpen(false)}
+                            className="block py-2 px-2 text-base text-gray-400 hover:text-white hover:bg-gray-900 transition-colors rounded md:hidden"
+                        >
+                            <FaSearch className="inline ml-2" />
+                            بحث
+                        </Link>
                     </div>
                 </div>
             </div>
