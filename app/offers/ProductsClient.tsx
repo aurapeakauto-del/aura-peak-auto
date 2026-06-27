@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getAllProducts } from '@/app/lib/products';
 import { Product } from '@/app/lib/products';
 import ProductCard from '@/app/components/ProductCard';
+import { FaSearch, FaTimes, FaRedo, FaPercent, FaTruck } from 'react-icons/fa';
 
 export default function OffersClient() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -64,7 +65,8 @@ export default function OffersClient() {
             {/* الهيدر */}
             <div className="border-b border-gray-200">
                 <div className="container mx-auto px-4 py-8">
-                    <h1 className="text-3xl font-light text-[#2c2c2c] tracking-wider">
+                    <h1 className="text-3xl font-light text-[#2c2c2c] tracking-wider flex items-center gap-3">
+                        <FaPercent className="text-amber-500" />
                         العروض والتخفيضات
                     </h1>
                     <p className="text-gray-500 mt-2">
@@ -79,29 +81,23 @@ export default function OffersClient() {
                     {/* شريط البحث */}
                     <div className="w-full md:w-2/3">
                         <div className="relative">
+                            <FaSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="ابحث عن عرض..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors rounded-none"
+                                className="w-full pr-10 pl-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors rounded-lg"
                             />
-                            <span className="absolute left-3 top-3 text-gray-400">🔍</span>
                         </div>
                     </div>
 
                     {/* قائمة منسدلة لأنواع العروض */}
-                    <div className="w-full md:w-1/3">
+                    <div className="w-full md:w-1/3 relative">
                         <select
                             value={offerType}
                             onChange={(e) => setOfferType(e.target.value)}
-                            className="w-full px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors appearance-none cursor-pointer rounded-none"
-                            style={{
-                                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20' stroke='%234a5568'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
-                                backgroundRepeat: 'no-repeat',
-                                backgroundPosition: 'left 1rem center',
-                                backgroundSize: '1.2rem',
-                            }}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors appearance-none cursor-pointer rounded-lg"
                         >
                             {offerTypes.map((type) => (
                                 <option key={type} value={type} className="bg-white text-[#2c2c2c]">
@@ -109,31 +105,37 @@ export default function OffersClient() {
                                 </option>
                             ))}
                         </select>
+                        <div className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
 
                 {/* عرض الفلترة النشطة */}
-                <div className="flex items-center gap-2 mt-4">
+                <div className="flex items-center gap-2 mt-4 flex-wrap">
                     <span className="text-gray-500 text-sm">الفلترة:</span>
                     {searchQuery && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm rounded">
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm rounded-full">
                             بحث: {searchQuery}
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="mr-1 text-gray-500 hover:text-[#2c2c2c]"
+                                className="text-gray-500 hover:text-[#2c2c2c]"
                             >
-                                ✕
+                                <FaTimes size={12} />
                             </button>
                         </span>
                     )}
                     {offerType !== 'الكل' && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm rounded">
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm rounded-full">
+                            {offerType === 'خصم' ? <FaPercent className="text-amber-500" /> : <FaTruck className="text-green-500" />}
                             {offerType}
                             <button
                                 onClick={() => setOfferType('الكل')}
-                                className="mr-1 text-gray-500 hover:text-[#2c2c2c]"
+                                className="text-gray-500 hover:text-[#2c2c2c]"
                             >
-                                ✕
+                                <FaTimes size={12} />
                             </button>
                         </span>
                     )}
@@ -149,8 +151,9 @@ export default function OffersClient() {
                             setSearchQuery('');
                             setOfferType('الكل');
                         }}
-                        className="mt-4 px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors rounded-none"
+                        className="mt-4 px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors rounded-lg inline-flex items-center gap-2"
                     >
+                        <FaRedo />
                         إعادة تعيين
                     </button>
                 </div>
