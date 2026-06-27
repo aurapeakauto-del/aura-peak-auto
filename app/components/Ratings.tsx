@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getProductRatings, addRating, getProductAverageRating, Rating } from '@/app/lib/ratings';
+import { FaStar, FaRegStar } from 'react-icons/fa';
 
 interface RatingsProps {
     productId: number;
@@ -24,7 +25,6 @@ export default function Ratings({ productId }: RatingsProps) {
     const loadRatings = async () => {
         const data = await getProductRatings(productId);
         setRatings(data);
-
         const avg = await getProductAverageRating(productId);
         setAverage(avg.average);
         setTotalRatings(avg.count);
@@ -33,14 +33,12 @@ export default function Ratings({ productId }: RatingsProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
-
         const newRating = await addRating({
             product_id: productId,
             user_name: userName || 'مستخدم',
             rating,
             comment: comment || undefined
         });
-
         if (newRating) {
             await loadRatings();
             setShowForm(false);
@@ -48,22 +46,22 @@ export default function Ratings({ productId }: RatingsProps) {
             setRating(5);
             setComment('');
         }
-
         setSubmitting(false);
     };
 
-    // عرض النجوم
+    // عرض النجوم باستخدام react-icons
     const renderStars = (value: number, interactive = false) => {
         const stars = [];
         for (let i = 1; i <= 5; i++) {
+            const filled = i <= value;
             stars.push(
                 <button
                     key={i}
                     type="button"
                     onClick={interactive ? () => setRating(i) : undefined}
-                    className={`text-2xl ${interactive ? 'cursor-pointer' : 'cursor-default'} ${i <= value ? 'text-yellow-400' : 'text-gray-300'}`}
+                    className={`text-2xl transition-colors ${interactive ? 'cursor-pointer hover:text-yellow-500' : 'cursor-default'} ${filled ? 'text-yellow-400' : 'text-gray-300'}`}
                 >
-                    ★
+                    {filled ? <FaStar /> : <FaRegStar />}
                 </button>
             );
         }
@@ -72,7 +70,10 @@ export default function Ratings({ productId }: RatingsProps) {
 
     return (
         <div className="mt-8 pt-8 border-t border-gray-200">
-            <h2 className="text-2xl font-light text-[#2c2c2c] mb-6">التقييمات</h2>
+            <h2 className="text-2xl font-light text-[#2c2c2c] mb-6 flex items-center gap-2">
+                <FaStar className="text-yellow-400" />
+                التقييمات
+            </h2>
 
             {/* ملخص التقييمات */}
             <div className="flex items-center gap-4 mb-6">
@@ -86,16 +87,16 @@ export default function Ratings({ productId }: RatingsProps) {
             {/* زر إضافة تقييم */}
             <button
                 onClick={() => setShowForm(!showForm)}
-                className="mb-6 px-4 py-2 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-sm"
+                className="mb-6 px-4 py-2 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-sm rounded"
             >
                 {showForm ? 'إلغاء' : 'أضف تقييمك'}
             </button>
 
             {/* نموذج إضافة تقييم */}
             {showForm && (
-                <form onSubmit={handleSubmit} className="mb-8 p-4 bg-white border border-gray-200">
+                <form onSubmit={handleSubmit} className="mb-8 p-4 bg-white border border-gray-200 rounded-lg">
                     <h3 className="text-[#2c2c2c] font-medium mb-4">أضف تقييمك</h3>
-                    
+
                     <div className="space-y-4">
                         <div>
                             <label className="block text-gray-600 text-sm mb-1">الاسم</label>
@@ -104,7 +105,7 @@ export default function Ratings({ productId }: RatingsProps) {
                                 value={userName}
                                 onChange={(e) => setUserName(e.target.value)}
                                 placeholder="اسمك (اختياري)"
-                                className="w-full px-3 py-2 border border-gray-200 focus:border-[#2c2c2c] focus:outline-none text-sm"
+                                className="w-full px-3 py-2 border border-gray-200 focus:border-[#2c2c2c] focus:outline-none text-sm rounded"
                             />
                         </div>
 
@@ -121,7 +122,7 @@ export default function Ratings({ productId }: RatingsProps) {
                                 value={comment}
                                 onChange={(e) => setComment(e.target.value)}
                                 rows={3}
-                                className="w-full px-3 py-2 border border-gray-200 focus:border-[#2c2c2c] focus:outline-none text-sm resize-none"
+                                className="w-full px-3 py-2 border border-gray-200 focus:border-[#2c2c2c] focus:outline-none text-sm resize-none rounded"
                                 placeholder="اكتب رأيك في المنتج..."
                             />
                         </div>
@@ -129,7 +130,7 @@ export default function Ratings({ productId }: RatingsProps) {
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="px-4 py-2 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors disabled:opacity-50 text-sm"
+                            className="px-4 py-2 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors disabled:opacity-50 text-sm rounded"
                         >
                             {submitting ? 'جاري الإرسال...' : 'إرسال التقييم'}
                         </button>
@@ -143,7 +144,7 @@ export default function Ratings({ productId }: RatingsProps) {
                     <p className="text-gray-500 text-center py-4">لا توجد تقييمات بعد</p>
                 ) : (
                     ratings.map((r) => (
-                        <div key={r.id} className="bg-white p-4 border border-gray-200">
+                        <div key={r.id} className="bg-white p-4 border border-gray-200 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="font-medium text-[#2c2c2c]">{r.user_name}</span>
                                 <span className="text-gray-400 text-xs">{new Date(r.created_at).toLocaleDateString('ar')}</span>
