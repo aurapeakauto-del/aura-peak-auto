@@ -1,31 +1,18 @@
 ﻿'use client';
 
 import { useCart } from '@/app/context/CartContext';
-import { useToast } from './Toast';
 import { useState, useEffect, useRef } from 'react';
 import { FaShoppingCart } from 'react-icons/fa';
 
 export default function FloatingCart() {
     const { totalItems, openCart } = useCart();
-    const { showToast } = useToast();
     const [isAnimating, setIsAnimating] = useState(false);
     const prevTotalRef = useRef(totalItems);
-    const toastShownRef = useRef(false);
 
     useEffect(() => {
         if (totalItems > prevTotalRef.current) {
             setIsAnimating(true);
-
-            if (!toastShownRef.current) {
-                showToast('تمت إضافة منتج إلى السلة', 'success');
-                toastShownRef.current = true;
-            }
-
-            const timer = setTimeout(() => {
-                setIsAnimating(false);
-                toastShownRef.current = false;
-            }, 500);
-
+            const timer = setTimeout(() => setIsAnimating(false), 500);
             return () => clearTimeout(timer);
         }
         prevTotalRef.current = totalItems;
