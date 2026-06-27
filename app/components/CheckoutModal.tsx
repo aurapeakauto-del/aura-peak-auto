@@ -20,14 +20,13 @@ const PAYMENT_METHODS = [
     'كليك'
 ];
 
-const DELIVERY_PRICE = 3; // دينار
+const DELIVERY_PRICE = 3;
 
 export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     const { items, totalPrice, clearCart } = useCart();
     const { showToast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // حقول الفورم
     const [fullName, setFullName] = useState('');
     const [governorate, setGovernorate] = useState('');
     const [city, setCity] = useState('');
@@ -40,7 +39,6 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
 
     const finalTotal = totalPrice + DELIVERY_PRICE;
 
-    // تنقيص المخزون
     const decreaseStock = async () => {
         setIsProcessing(true);
         let success = true;
@@ -62,19 +60,12 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
         return success;
     };
 
-    // حفظ الطلب مع معلومات العميل
-    // حفظ الطلب (متوافق مع جدول orders)
     const saveOrder = async () => {
         try {
             const { addOrder } = await import('@/app/lib/orders');
-
-            // نجمع معلومات العنوان والدفع في notes
-            const addressInfo = `المحافظة: ${governorate}\nالمدينة: ${city}\nالشارع: ${street}\nالدفع: ${paymentMethod}`;
-            const combinedNotes = [notes, addressInfo].filter(Boolean).join('\n---\n');
-
             const orderData = {
                 customer_name: fullName,
-                customer_phone: whatsapp || phone, // نستخدم الواتساب أو الهاتف
+                customer_phone: whatsapp || phone,
                 customer_email: '',
                 total_amount: finalTotal,
                 items: items.map(item => ({
@@ -85,15 +76,9 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                     variant: item.variant || null,
                     image: item.image || ''
                 })),
-                status: 'جديد',
-                notes: combinedNotes // نضيف جميع التفاصيل هنا (إن كان الجدول يحتوي عمود notes)
+                status: 'جديد'
             };
-
-            // إذا كان جدول orders لا يحتوي عمود notes، نحذفه
-            const finalOrder: any = { ...orderData };
-            // (اختياري: يمكن حذف notes إذا لم يكن موجوداً في الجدول، لكن سنتركه - Supabase سيتجاهل الحقول الزائدة غالباً)
-
-            const result = await addOrder(finalOrder);
+            const result = await addOrder(orderData);
             return !!result;
         } catch (error) {
             console.error('❌ خطأ في حفظ الطلب:', error);
@@ -101,28 +86,43 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
         }
     };
 
-    const generateWhatsAppMessage = () => {
-        let message = '🛒 *طلب جديد من Aura Peak Auto*\n';
-        message += '━━━━━━━━━━━━━━━━━━━━\n\n';
-        message += `👤 الاسم: ${fullName}\n`;
-        message += `📍 المحافظة: ${governorate}\n`;
-        message += `🏘️ الحي/المدينة: ${city}\n`;
-        message += `📍 الشارع: ${street}\n`;
-        message += `📞 الهاتف: ${phone}\n`;
-        if (whatsapp) message += `💬 الواتساب: ${whatsapp}\n`;
-        message += `💳 الدفع: ${paymentMethod}\n`;
-        if (notes) message += `📝 ملاحظات: ${notes}\n`;
-        message += '\n━━━━━━━━━━━━━━━━━━━━\n';
-        message += '📦 *المنتجات:*\n';
-        items.forEach((item, i) => {
-            message += `• ${item.name} (${item.quantity}x) - JD ${(item.price * item.quantity).toFixed(2)}\n`;
-        });
-        message += '\n';
-        message += `🚚 سعر التوصيل: JD ${DELIVERY_PRICE.toFixed(2)}\n`;
-        message += `💰 الإجمالي: JD ${finalTotal.toFixed(2)}\n`;
-        message += '━━━━━━━━━━━━━━━━━━━━\n';
-        message += `🕐 ${new Date().toLocaleDateString('ar-JO')}`;
-        return encodeURIComponent(message);
+    const sendToTelegram = async () => {
+        try {
+            const botToken = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+            const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+            if (!botToken || !chatId) return false;
+
+            let message = '🛒 *طلب جديد من Aura Peak Auto*\n\n';
+            message += `👤 *الاسم:* ${fullName}\n`;
+            message += `📍 *المحافظة:* ${governorate}\n`;
+            message += `🏘️ *المدينة/الحي:* ${city}\n`;
+            message += `📍 *الشارع:* ${street}\n`;
+            message += `📞 *الهاتف:* ${phone}\n`;
+            if (whatsapp) message += `💬 *الواتساب:* ${whatsapp}\n`;
+            message += `💳 *الدفع:* ${paymentMethod}\n`;
+            if (notes) message += `📝 *ملاحظات:* ${notes}\n`;
+            message += '\n📦 *المنتجات:*\n';
+            items.forEach((item, i) => {
+                message += `• ${item.name} (${item.quantity}x) - JD ${(item.price * item.quantity).toFixed(2)}\n`;
+            });
+            message += `\n🚚 *التوصيل:* JD ${DELIVERY_PRICE.toFixed(2)}\n`;
+            message += `💰 *الإجمالي:* JD ${finalTotal.toFixed(2)}\n`;
+            message += `🕐 ${new Date().toLocaleDateString('ar-JO')}`;
+
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: message,
+                    parse_mode: 'Markdown'
+                })
+            });
+            return true;
+        } catch (error) {
+            console.error('خطأ في إرسال تيليجرام:', error);
+            return false;
+        }
     };
 
     const validate = () => {
@@ -150,15 +150,14 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
         }
 
         const orderSuccess = await saveOrder();
-
         if (orderSuccess) {
-            const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '962798072373';
-            window.open(`https://wa.me/${whatsappNumber}?text=${generateWhatsAppMessage()}`, '_blank');
+            // إرسال إلى تيليجرام دون انتظار نجاحه
+            sendToTelegram();
             showToast('تم إرسال طلبك بنجاح!', 'success', 5000);
             clearCart();
             onClose();
         } else {
-            showToast('تم تحديث المخزون ولكن فشل حفظ الطلب', 'warning');
+            showToast('فشل حفظ الطلب، حاول مرة أخرى', 'error');
         }
     };
 
@@ -172,14 +171,11 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* الاسم */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">الاسم الكامل</label>
                         <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                         {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>}
                     </div>
-
-                    {/* المحافظة */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">المحافظة</label>
                         <select value={governorate} onChange={e => setGovernorate(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
@@ -188,36 +184,26 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                         </select>
                         {errors.governorate && <p className="text-red-500 text-xs mt-1">{errors.governorate}</p>}
                     </div>
-
-                    {/* المدينة/الحي */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">المدينة/الحي</label>
                         <input type="text" value={city} onChange={e => setCity(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                         {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
                     </div>
-
-                    {/* الشارع */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">الشارع</label>
                         <input type="text" value={street} onChange={e => setStreet(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                         {errors.street && <p className="text-red-500 text-xs mt-1">{errors.street}</p>}
                     </div>
-
-                    {/* الهاتف */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">رقم الهاتف</label>
                         <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="0791234567" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                     </div>
-
-                    {/* الواتساب */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">رقم الواتساب (إذا كان مختلفاً)</label>
                         <input type="tel" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="0791234567" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                         {errors.whatsapp && <p className="text-red-500 text-xs mt-1">{errors.whatsapp}</p>}
                     </div>
-
-                    {/* طريقة الدفع */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">طريقة الدفع</label>
                         <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
@@ -226,14 +212,11 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                         </select>
                         {errors.paymentMethod && <p className="text-red-500 text-xs mt-1">{errors.paymentMethod}</p>}
                     </div>
-
-                    {/* ملاحظات */}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">ملاحظات إضافية</label>
                         <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                     </div>
 
-                    {/* ملخص الطلب */}
                     <div className="bg-gray-50 p-4 rounded space-y-2">
                         <h3 className="font-medium text-[#2c2c2c] text-sm">ملخص الطلب</h3>
                         {items.map((item, i) => (
@@ -252,14 +235,9 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                         </div>
                     </div>
 
-                    {/* تحذير */}
                     <p className="text-xs text-gray-500">⚠️ يرجى التأكد من صحة رقم الهاتف والواتساب لتأكيد الطلب.</p>
 
-                    <button
-                        type="submit"
-                        disabled={isProcessing}
-                        className="w-full py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded disabled:opacity-50"
-                    >
+                    <button type="submit" disabled={isProcessing} className="w-full py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors text-sm font-medium rounded disabled:opacity-50">
                         {isProcessing ? 'جاري المعالجة...' : 'إتمام الطلب'}
                     </button>
                 </form>
