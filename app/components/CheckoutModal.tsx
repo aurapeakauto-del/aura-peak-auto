@@ -265,7 +265,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                             <span>JD {totalPrice.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span>🚚 التوصيل</span>
+                            <span>🚚 التوصيل <span className="text-xs text-gray-400">(يختلف حسب المحافظة وحجم الطلب)</span></span>
                             <span>JD {DELIVERY_PRICE.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between font-bold text-[#2c2c2c] border-t pt-1">
