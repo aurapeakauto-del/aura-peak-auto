@@ -2,35 +2,34 @@
 
 import { useCart } from '@/app/context/CartContext';
 import { useToast } from './Toast';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { FaShoppingCart } from 'react-icons/fa';
 
 export default function FloatingCart() {
     const { totalItems, openCart } = useCart();
     const { showToast } = useToast();
     const [isAnimating, setIsAnimating] = useState(false);
     const prevTotalRef = useRef(totalItems);
-    const toastShownRef = useRef(false); // ✅ لمنع تكرار الـ toast
+    const toastShownRef = useRef(false);
 
     useEffect(() => {
-        // ✅ فقط إذا زاد العدد
         if (totalItems > prevTotalRef.current) {
             setIsAnimating(true);
-            
-            // ✅ منع تكرار الـ toast
+
             if (!toastShownRef.current) {
                 showToast('تمت إضافة منتج إلى السلة', 'success');
                 toastShownRef.current = true;
             }
-            
+
             const timer = setTimeout(() => {
                 setIsAnimating(false);
-                toastShownRef.current = false; // ✅ إعادة التعيين بعد انتهاء التأثير
+                toastShownRef.current = false;
             }, 500);
-            
+
             return () => clearTimeout(timer);
         }
         prevTotalRef.current = totalItems;
-    }, [totalItems]); // ✅ إزالة showToast من الـ dependencies
+    }, [totalItems]);
 
     if (totalItems === 0) return null;
 
@@ -42,13 +41,13 @@ export default function FloatingCart() {
         >
             <div className={`
                 relative p-4 rounded-full shadow-2xl transition-all duration-300
-                ${isAnimating 
-                    ? 'bg-amber-500 scale-110' 
+                ${isAnimating
+                    ? 'bg-amber-500 scale-110'
                     : 'bg-gray-900 hover:bg-amber-600'
                 }
             `}>
-                <span className="text-white text-2xl block transform group-hover:rotate-6 transition-transform">
-                    🛒
+                <span className="text-white block transform group-hover:rotate-6 transition-transform">
+                    <FaShoppingCart size={24} />
                 </span>
 
                 {totalItems > 0 && (
