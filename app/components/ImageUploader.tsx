@@ -1,6 +1,14 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from './Toast';
+import {
+    FaCloudUploadAlt,
+    FaImages,
+    FaSearch,
+    FaTimes,
+    FaTrash
+} from 'react-icons/fa';
 
 interface ImageUploaderProps {
     onUpload: (url: string) => void;
@@ -11,6 +19,7 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
     const [showLibrary, setShowLibrary] = useState(false);
     const [savedImages, setSavedImages] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const { showToast } = useToast();
 
     // تحميل الصور المحفوظة من localStorage عند تحميل المكون
     useEffect(() => {
@@ -57,13 +66,13 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
             if (data.secure_url) {
                 onUpload(data.secure_url);
                 saveImageToLibrary(data.secure_url);
-                alert('✅ تم رفع الصورة بنجاح');
+                showToast('تم رفع الصورة بنجاح', 'success');
             } else {
                 throw new Error('فشل رفع الصورة');
             }
         } catch (error) {
             console.error('خطأ في رفع الصورة:', error);
-            alert('❌ فشل رفع الصورة');
+            showToast('فشل رفع الصورة', 'error');
         } finally {
             setUploading(false);
         }
@@ -73,7 +82,7 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
     const selectFromLibrary = (url: string) => {
         onUpload(url);
         setShowLibrary(false);
-        alert('✅ تم اختيار الصورة');
+        showToast('تم اختيار الصورة', 'success');
     };
 
     // حذف صورة من المكتبة
@@ -82,7 +91,7 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
         const newImages = savedImages.filter(img => img !== url);
         setSavedImages(newImages);
         localStorage.setItem('cloudinary_images', JSON.stringify(newImages));
-        alert('🗑️ تم حذف الصورة من المكتبة');
+        showToast('تم حذف الصورة من المكتبة', 'info');
     };
 
     // تصفية الصور حسب البحث
@@ -94,8 +103,18 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
         <div className="mt-2">
             {/* أزرار الرفع */}
             <div className="flex flex-wrap gap-2">
-                <label className={`cursor-pointer bg-[#2c2c2c] text-white px-4 py-2 text-sm hover:bg-gray-800 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    {uploading ? 'جاري الرفع...' : '📤 رفع صورة جديدة'}
+                <label className={`cursor-pointer bg-[#2c2c2c] text-white px-4 py-2 text-sm hover:bg-gray-800 transition-colors rounded-lg flex items-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {uploading ? (
+                        <>
+                            <FaCloudUploadAlt className="animate-pulse" />
+                            جاري الرفع...
+                        </>
+                    ) : (
+                        <>
+                            <FaCloudUploadAlt />
+                            رفع صورة جديدة
+                        </>
+                    )}
                     <input
                         type="file"
                         accept="image/*"
@@ -108,9 +127,10 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
                 <button
                     type="button"
                     onClick={() => setShowLibrary(true)}
-                    className="bg-gray-700 text-white px-4 py-2 text-sm hover:bg-gray-600 transition-colors"
+                    className="bg-gray-700 text-white px-4 py-2 text-sm hover:bg-gray-600 transition-colors rounded-lg flex items-center gap-2"
                 >
-                    📚 اختر من المكتبة
+                    <FaImages />
+                    اختر من المكتبة
                 </button>
             </div>
 
@@ -120,24 +140,30 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
                     <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
                         {/* رأس النافذة */}
                         <div className="flex justify-between items-center p-4 border-b border-gray-700">
-                            <h3 className="text-white text-lg font-light">مكتبة الصور المرفوعة</h3>
+                            <h3 className="text-white text-lg font-light flex items-center gap-2">
+                                <FaImages className="text-amber-500" />
+                                مكتبة الصور المرفوعة
+                            </h3>
                             <button
                                 onClick={() => setShowLibrary(false)}
-                                className="text-gray-400 hover:text-white text-xl"
+                                className="text-gray-400 hover:text-white transition-colors"
                             >
-                                ✕
+                                <FaTimes size={20} />
                             </button>
                         </div>
 
                         {/* شريط البحث */}
                         <div className="p-4 border-b border-gray-700">
-                            <input
-                                type="text"
-                                placeholder="🔍 بحث في الصور..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full px-4 py-2 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none rounded"
-                            />
+                            <div className="relative">
+                                <FaSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                <input
+                                    type="text"
+                                    placeholder="بحث في الصور..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pr-10 pl-4 py-2 bg-black border border-gray-700 text-white focus:border-amber-500 focus:outline-none rounded-lg"
+                                />
+                            </div>
                         </div>
 
                         {/* شبكة الصور */}
@@ -146,11 +172,12 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
                                 <div className="text-center text-gray-500 py-12">
                                     {savedImages.length === 0 ? (
                                         <>
-                                            <p className="mb-2">📭 لا توجد صور مرفوعة مسبقاً</p>
-                                            <p className="text-sm">ارفع صوراً جديدة باستخدام "رفع صورة جديدة"</p>
+                                            <FaImages className="text-4xl mx-auto mb-3 text-gray-600" />
+                                            <p className="mb-2">لا توجد صور مرفوعة مسبقاً</p>
+                                            <p className="text-sm">ارفع صوراً جديدة باستخدام زر "رفع صورة جديدة"</p>
                                         </>
                                     ) : (
-                                        <p>🔍 لا توجد نتائج مطابقة للبحث</p>
+                                        <p>لا توجد نتائج مطابقة للبحث</p>
                                     )}
                                 </div>
                             ) : (
@@ -170,7 +197,7 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
                                                 onClick={(e) => deleteFromLibrary(url, e)}
                                                 className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                                             >
-                                                ✕
+                                                <FaTrash size={12} />
                                             </button>
                                             <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
                                                 اختر
@@ -185,8 +212,9 @@ export default function ImageUploader({ onUpload }: ImageUploaderProps) {
                         <div className="p-4 border-t border-gray-700 text-right">
                             <button
                                 onClick={() => setShowLibrary(false)}
-                                className="px-6 py-2 bg-gray-700 text-white hover:bg-gray-600 transition-colors rounded"
+                                className="px-6 py-2 bg-gray-700 text-white hover:bg-gray-600 transition-colors rounded-lg flex items-center gap-2 ml-auto"
                             >
+                                <FaTimes />
                                 إغلاق
                             </button>
                         </div>
