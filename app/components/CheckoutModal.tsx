@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useCart } from '@/app/context/CartContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { updateProduct } from '@/app/lib/products';
 import { useToast } from './Toast';
 
@@ -27,6 +27,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     const { showToast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // ✅ استعادة بيانات العميل من localStorage
     const [fullName, setFullName] = useState('');
     const [governorate, setGovernorate] = useState('');
     const [city, setCity] = useState('');
@@ -36,6 +37,32 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     const [paymentMethod, setPaymentMethod] = useState('');
     const [notes, setNotes] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // ✅ تحميل البيانات المحفوظة عند فتح الـ Modal
+    useEffect(() => {
+        const saved = localStorage.getItem('checkout_data');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                setFullName(data.fullName || '');
+                setGovernorate(data.governorate || '');
+                setCity(data.city || '');
+                setStreet(data.street || '');
+                setPhone(data.phone || '');
+                setWhatsapp(data.whatsapp || '');
+                setPaymentMethod(data.paymentMethod || '');
+                setNotes(data.notes || '');
+            } catch (e) {
+                // ignore
+            }
+        }
+    }, []);
+
+    // ✅ حفظ البيانات تلقائياً عند تغير أي حقل
+    useEffect(() => {
+        const data = { fullName, governorate, city, street, phone, whatsapp, paymentMethod, notes };
+        localStorage.setItem('checkout_data', JSON.stringify(data));
+    }, [fullName, governorate, city, street, phone, whatsapp, paymentMethod, notes]);
 
     const finalTotal = totalPrice + DELIVERY_PRICE;
 
@@ -79,20 +106,23 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                 status: 'جديد'
             };
             const result = await addOrder(orderData);
-            return !!result;
+            // ✅ نرجع الـ order ID إذا نجح الحفظ
+            if (result) return result.id;
+            return null;
         } catch (error) {
             console.error('❌ خطأ في حفظ الطلب:', error);
-            return false;
+            return null;
         }
     };
 
-    const sendToTelegram = async () => {
+    const sendToTelegram = async (orderId: number) => {
         try {
             const botToken = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
             const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
             if (!botToken || !chatId) return false;
 
-            let message = '🛒 *طلب جديد من Aura Peak Auto*\n\n';
+            let message = `🛒 *طلب جديد #${orderId}*\n`;
+            message += '━━━━━━━━━━━━━━━━━━━━\n\n';
             message += `👤 *الاسم:* ${fullName}\n`;
             message += `📍 *المحافظة:* ${governorate}\n`;
             message += `🏘️ *المدينة/الحي:* ${city}\n`;
@@ -101,12 +131,16 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
             if (whatsapp) message += `💬 *الواتساب:* ${whatsapp}\n`;
             message += `💳 *الدفع:* ${paymentMethod}\n`;
             if (notes) message += `📝 *ملاحظات:* ${notes}\n`;
-            message += '\n📦 *المنتجات:*\n';
+            message += '\n━━━━━━━━━━━━━━━━━━━━\n';
+            message += '📦 *المنتجات:*\n';
             items.forEach((item, i) => {
                 message += `• ${item.name} (${item.quantity}x) - JD ${(item.price * item.quantity).toFixed(2)}\n`;
             });
-            message += `\n🚚 *التوصيل:* JD ${DELIVERY_PRICE.toFixed(2)}\n`;
-            message += `💰 *الإجمالي:* JD ${finalTotal.toFixed(2)}\n`;
+            message += '\n';
+            message += `📦 *مجموع المنتجات:* JD ${totalPrice.toFixed(2)}\n`;
+            message += `🚚 *التوصيل:* JD ${DELIVERY_PRICE.toFixed(2)}\n`;
+            message += '━━━━━━━━━━━━━━━━━━━━\n';
+            message += `💰 *الإجمالي النهائي:* JD ${finalTotal.toFixed(2)}\n`;
             message += `🕐 ${new Date().toLocaleDateString('ar-JO')}`;
 
             await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -149,12 +183,12 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
             return;
         }
 
-        const orderSuccess = await saveOrder();
-        if (orderSuccess) {
-            // إرسال إلى تيليجرام دون انتظار نجاحه
-            sendToTelegram();
+        const orderId = await saveOrder();
+        if (orderId) {
+            sendToTelegram(orderId);
             showToast('تم إرسال طلبك بنجاح!', 'success', 5000);
             clearCart();
+            localStorage.removeItem('checkout_data'); // ✅ مسح البيانات بعد الطلب الناجح
             onClose();
         } else {
             showToast('فشل حفظ الطلب، حاول مرة أخرى', 'error');
@@ -217,6 +251,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                         <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
                     </div>
 
+                    {/* ✅ ملخص الطلب مع التوصيل قبل المجموع */}
                     <div className="bg-gray-50 p-4 rounded space-y-2">
                         <h3 className="font-medium text-[#2c2c2c] text-sm">ملخص الطلب</h3>
                         {items.map((item, i) => (
@@ -226,11 +261,15 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                             </div>
                         ))}
                         <div className="flex justify-between text-sm border-t pt-1">
-                            <span>التوصيل</span>
+                            <span>📦 مجموع المنتجات</span>
+                            <span>JD {totalPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span>🚚 التوصيل</span>
                             <span>JD {DELIVERY_PRICE.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between font-bold text-[#2c2c2c] border-t pt-1">
-                            <span>الإجمالي</span>
+                            <span>💰 الإجمالي</span>
                             <span>JD {finalTotal.toFixed(2)}</span>
                         </div>
                     </div>
