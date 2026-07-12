@@ -4,13 +4,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { getAllProducts } from '@/app/lib/products';
 import { Product } from '@/app/lib/products';
 import ProductCard from '@/app/components/ProductCard';
-import { FaSearch, FaTimes, FaRedo, FaPercent, FaTruck } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaTimes, FaRedo, FaPercent, FaTruck } from 'react-icons/fa';
 
 export default function OffersClient() {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [offerType, setOfferType] = useState('الكل');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [showFilter, setShowFilter] = useState(false);
+    const [allCategories, setAllCategories] = useState<string[]>([]);
 
     useEffect(() => {
         loadProducts();
@@ -20,6 +23,8 @@ export default function OffersClient() {
         setLoading(true);
         const data = await getAllProducts();
         setProducts(data);
+        const cats = Array.from(new Set(data.flatMap(p => p.categories || []))).sort();
+        setAllCategories(cats);
         setLoading(false);
     };
 
@@ -45,9 +50,11 @@ export default function OffersClient() {
                 matchesOffer = product.freeShipping === true;
             }
 
-            return matchesSearch && matchesOffer;
+            const matchesCategory = !selectedCategory || product.categories?.includes(selectedCategory);
+
+            return matchesSearch && matchesOffer && matchesCategory;
         });
-    }, [searchQuery, offerType, offerProducts]);
+    }, [searchQuery, offerType, selectedCategory, offerProducts]);
 
     if (loading) {
         return (
@@ -75,43 +82,101 @@ export default function OffersClient() {
                 </div>
             </div>
 
-            {/* شريط البحث والفلترة */}
+            {/* Search + Filters */}
             <div className="container mx-auto px-4 py-8">
-                <div className="flex flex-col md:flex-row gap-4">
-                    {/* شريط البحث */}
-                    <div className="w-full md:w-2/3">
-                        <div className="relative">
-                            <FaSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="ابحث عن عرض..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pr-10 pl-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors rounded-lg"
-                            />
-                        </div>
+                <div className="flex gap-2 items-center">
+                    <div className="relative flex-1">
+                        <FaSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="ابحث عن عرض..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pr-10 pl-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm rounded-lg"
+                        />
                     </div>
-
-                    {/* قائمة منسدلة لأنواع العروض */}
-                    <div className="w-full md:w-1/3 relative">
+                    
+                    {/* زر الفلترة - يظهر فقط على الهاتف */}
+                    <button
+                        onClick={() => setShowFilter(!showFilter)}
+                        className={`lg:hidden flex items-center gap-2 px-4 py-3 border rounded-lg text-sm transition-colors ${
+                            showFilter || offerType !== 'الكل' || selectedCategory
+                                ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]'
+                                : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                        }`}
+                    >
+                        <FaFilter />
+                        {(offerType !== 'الكل' || selectedCategory) ? `(${offerType !== 'الكل' ? 1 : 0}${selectedCategory ? 1 : 0})` : ''}
+                    </button>
+                    
+                    {/* قوائم الفلترة - تظهر فقط على سطح المكتب */}
+                    <div className="hidden lg:flex gap-2 w-auto">
                         <select
                             value={offerType}
                             onChange={(e) => setOfferType(e.target.value)}
-                            className="w-full px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors appearance-none cursor-pointer rounded-lg"
+                            className="px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm appearance-none cursor-pointer rounded-lg min-w-[160px]"
                         >
                             {offerTypes.map((type) => (
-                                <option key={type} value={type} className="bg-white text-[#2c2c2c]">
-                                    {type}
-                                </option>
+                                <option key={type} value={type}>{type}</option>
                             ))}
                         </select>
-                        <div className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
+                        <select
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            className="px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm appearance-none cursor-pointer rounded-lg min-w-[160px]"
+                        >
+                            <option value="">جميع التصنيفات</option>
+                            {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
                     </div>
                 </div>
+
+                {/* قائمة الفلترة المنسدلة للهاتف */}
+                {showFilter && (
+                    <div className="mt-2 p-4 bg-white border border-gray-200 rounded-lg lg:hidden space-y-4">
+                        <div>
+                            <p className="text-xs text-gray-500 mb-2">نوع العرض</p>
+                            <div className="flex flex-wrap gap-2">
+                                {offerTypes.map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => { setOfferType(type); setShowFilter(false); }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 ${
+                                            offerType === type ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                                        }`}
+                                    >
+                                        {type === 'خصم' ? <FaPercent size={10} /> : type === 'توصيل مجاني' ? <FaTruck size={10} /> : null}
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 mb-2">التصنيفات</p>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => { setSelectedCategory(''); setShowFilter(false); }}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                        !selectedCategory ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                                    }`}
+                                >
+                                    الكل
+                                </button>
+                                {allCategories.map(cat => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => { setSelectedCategory(cat); setShowFilter(false); }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                            selectedCategory === cat ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                                        }`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* عرض الفلترة النشطة */}
                 <div className="flex items-center gap-2 mt-4 flex-wrap">
@@ -119,24 +184,20 @@ export default function OffersClient() {
                     {searchQuery && (
                         <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm rounded-full">
                             بحث: {searchQuery}
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="text-gray-500 hover:text-[#2c2c2c]"
-                            >
-                                <FaTimes size={12} />
-                            </button>
+                            <button onClick={() => setSearchQuery('')} className="text-gray-500 hover:text-[#2c2c2c]"><FaTimes size={12} /></button>
                         </span>
                     )}
                     {offerType !== 'الكل' && (
                         <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm rounded-full">
                             {offerType === 'خصم' ? <FaPercent className="text-amber-500" /> : <FaTruck className="text-green-500" />}
                             {offerType}
-                            <button
-                                onClick={() => setOfferType('الكل')}
-                                className="text-gray-500 hover:text-[#2c2c2c]"
-                            >
-                                <FaTimes size={12} />
-                            </button>
+                            <button onClick={() => setOfferType('الكل')} className="text-gray-500 hover:text-[#2c2c2c]"><FaTimes size={12} /></button>
+                        </span>
+                    )}
+                    {selectedCategory && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-[#2c2c2c] text-sm rounded-full">
+                            {selectedCategory}
+                            <button onClick={() => setSelectedCategory('')} className="text-gray-500 hover:text-[#2c2c2c]"><FaTimes size={12} /></button>
                         </span>
                     )}
                 </div>
@@ -150,6 +211,7 @@ export default function OffersClient() {
                         onClick={() => {
                             setSearchQuery('');
                             setOfferType('الكل');
+                            setSelectedCategory('');
                         }}
                         className="mt-4 px-6 py-3 bg-[#2c2c2c] text-white hover:bg-gray-800 transition-colors rounded-lg inline-flex items-center gap-2"
                     >
@@ -159,7 +221,7 @@ export default function OffersClient() {
                 </div>
             ) : (
                 <div className="container mx-auto px-4 py-12">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                         {filteredOffers.map((product) => (
                             <ProductCard key={product.id} product={product} />
                         ))}
