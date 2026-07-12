@@ -7,10 +7,12 @@ import ProductCard from '@/app/components/ProductCard';
 import { getAllProducts } from '@/app/lib/products';
 import { getBestSellers } from '@/app/lib/orders';
 import type { Product } from '@/app/lib/products';
+import { FaSearch, FaFilter } from 'react-icons/fa';
 
 const ITEMS_PER_PAGE = 12;
 
 export default function ProductsClient() {
+    const [showFilter, setShowFilter] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
     const firstRender = useRef(true);
@@ -167,25 +169,87 @@ export default function ProductsClient() {
 
             <div className="max-w-7xl mx-auto px-4 py-6">
                 {/* Search + Category Dropdown */}
-                <div className="mb-6 flex gap-3 items-center">
-                    <input
-                        type="text"
-                        placeholder="ابحث عن منتج..."
-                        value={search}
-                        onChange={handleSearchChange}
-                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#1a1a1a] transition-colors"
-                    />
-                    <select
-                        value={selectedCategory}
-                        onChange={handleCategoryChange}
-                        className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm bg-white min-w-[180px] focus:outline-none focus:border-[#1a1a1a] transition-colors"
+                {/* Search + Filter - متجاوب مع الهاتف */}
+<div className="mb-6">
+    {/* شريط البحث مع زر الفلترة */}
+    <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
+            <FaSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+                type="text"
+                placeholder="ابحث عن منتج..."
+                value={search}
+                onChange={handleSearchChange}
+                className="w-full pr-10 pl-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] placeholder-gray-400 focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm rounded-lg"
+            />
+        </div>
+        
+        {/* زر الفلترة - يظهر فقط على الهاتف */}
+        <button
+            onClick={() => setShowFilter(!showFilter)}
+            className={`lg:hidden flex items-center gap-2 px-4 py-3 border rounded-lg text-sm transition-colors ${
+                showFilter || selectedCategory
+                    ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]'
+                    : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+            }`}
+        >
+            <FaFilter />
+            {selectedCategory ? `(${1})` : ''}
+        </button>
+        
+        {/* Select الفلترة - يظهر فقط على سطح المكتب */}
+        <div className="hidden lg:block w-1/3">
+            <select
+                value={selectedCategory}
+                onChange={handleCategoryChange}
+                className="w-full px-4 py-3 bg-white border border-gray-300 text-[#2c2c2c] focus:border-[#2c2c2c] focus:outline-none transition-colors text-sm appearance-none cursor-pointer rounded-lg"
+            >
+                <option value="">جميع التصنيفات</option>
+                {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
+        </div>
+    </div>
+
+    {/* قائمة الفلترة المنسدلة للهاتف */}
+    {showFilter && (
+        <div className="mt-2 p-4 bg-white border border-gray-200 rounded-lg lg:hidden">
+            <div className="flex flex-wrap gap-2">
+                <button
+                    onClick={() => {
+                        setSelectedCategory('');
+                        setCurrentPage(1);
+                        window.scrollTo(0, 0);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        !selectedCategory
+                            ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                    }`}
+                >
+                    الكل
+                </button>
+                {allCategories.map(cat => (
+                    <button
+                        key={cat}
+                        onClick={() => {
+                            setSelectedCategory(cat);
+                            setCurrentPage(1);
+                            window.scrollTo(0, 0);
+                            setShowFilter(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                            selectedCategory === cat
+                                ? 'bg-[#2c2c2c] text-white border-[#2c2c2c]'
+                                : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                        }`}
                     >
-                        <option value="">جميع التصنيفات</option>
-                        {allCategories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                    </select>
-                </div>
+                        {cat}
+                    </button>
+                ))}
+            </div>
+        </div>
+    )}
+</div>
 
                 {/* Product Grid */}
                 {paginated.length === 0 ? (
